@@ -1,0 +1,120 @@
+
+// // mapchannelform - Button Handler Function
+// // This displays the form to map a Cliq channel to a Workast space
+response = Map();
+try 
+{
+	info arguments;
+	key = arguments.get("key");
+	// Handle webhook token generation for new users
+	// Get user's API token
+	query = Map();
+	query.put("criteria","userid=" + user.get("id"));
+	db = zoho.cliq.getRecords("workastdb",query);
+	if(db.get("list").size() == 0)
+	{
+		result = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		result.put("bot",bot);
+		result.put("text","❌ Your Workast account is not linked.");
+		return result;
+	}
+	apitoken = db.get("list").get(0).get("apitoken");
+	//--------------------------------------------
+	// 1. GET WORKAST SPACES
+	//--------------------------------------------
+	headers = Map();
+	headers.put("Authorization","Bearer " + apitoken);
+	spaces = invokeurl
+	[
+		url :"https://api.todobot.io/list"
+		type :GET
+		headers:headers
+	];
+	options = List();
+	for each  s in spaces
+	{
+		// Check if already mapped
+		q = Map();
+		q.put("criteria","projectid=" + s.get("id"));
+		db_channelmapping = zoho.cliq.getRecords("workastchannelmapping",q);
+		if(db_channelmapping.get("list").size() == 0)
+		{
+			spaceName = s.get("name");
+			if(spaceName != null && spaceName.trim().toLowerCase() == "personal tasks")
+			{
+				continue;
+			}
+			if(spaceName == null || spaceName == "")
+			{
+				spaceName = "Untitled Space";
+			}
+			if(spaceName.length() >= 50)
+			{
+				spaceName = spaceName.subString(0,47) + "..";
+			}
+			opt = Map();
+			opt.put("value",s.get("id"));
+			opt.put("label",spaceName);
+			opt.put("thumbnail","https://cdn.workast.io/avatar.png");
+			options.add(opt);
+		}
+	}
+	if(options.size() == 0)
+	{
+		if(spaces.size() != 0)
+		{
+			result = Map();
+			bot = Map();
+			bot.put("name","Workast");
+			bot.put("image","https://cdn.workast.io/avatar.png");
+			result.put("bot",bot);
+			card = Map();
+			card.put("theme","poll");
+			result.put("card",card);
+			result.put("text","❗ All spaces are currently mapped.");
+			return result;
+		}
+		result = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		result.put("bot",bot);
+		card = Map();
+		card.put("theme","poll");
+		result.put("card",card);
+		result.put("text","❗You don't have any spaces in your Workast account.");
+		return result;
+	}
+	//--------------------------------------------
+	// 2. EVENT OPTIONS
+	//--------------------------------------------
+	events = List();
+	events.add({"label":"Task Created","value":"task_created"});
+	events.add({"label":"Task Completed","value":"task_completed"});
+	events.add({"label":"Task Assigned","value":"task_assigned"});
+	events.add({"label":"Comment Added","value":"task_comment_added"});
+	events.add({"label":"Due Date Changed","value":"task_due_date_changed"});
+	//--------------------------------------------
+	// 3. BUILD FORM
+	//--------------------------------------------
+	inputs = list();
+	inputs.add({"name":"spaceid","label":"Workast Space","placeholder":"Choose a Space","multiple":false,"mandatory":true,"type":"dynamic_select","options":options});
+	inputs.add({"label":"Choose a channel","name":"channel_id","placeholder":"Choose from the list of all channels.","multiple":false,"mandatory":true,"type":"native_select","data_source":"channels"});
+	inputs.add({"type":"dynamic_select","name":"events","placeholder":"Select Events","label":"Events","mandatory":true,"multiple":true,"options":events});
+	form = {"type":"form","title":"Map Channel","name":"form","version":1,"button_label":"Map Channel","actions":{"submit":{"type":"invoke.function","name":"mapchannel"}},"inputs":inputs};
+	return form;
+}
+catch (e)
+{
+	result = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	result.put("bot",bot);
+	result.put("text","❌ Error loading form: " + e.toString());
+	return result;
+}
+return response;

@@ -1,0 +1,118 @@
+
+result = Map();
+info "Form submit triggered";
+try 
+{
+	form_values = form.get("values");
+	info "Form Values: " + form_values;
+	userToken = form_values.get("apikey");
+	info "Token: " + userToken;
+	if(userToken == null || userToken.trim() == "")
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		result.put("bot",bot);
+		result.put("text","⚠️ API token cannot be empty.");
+		return result;
+	}
+	// REAL Workast API validation using user token
+	response = invokeurl
+	[
+		url :"https://api.todobot.io/me"
+		type :GET
+		headers:{"Authorization":"Bearer " + userToken}
+	];
+	info "Workast API Response: " + response;
+	// 	info "Response Type: " + response.getType();
+	// Check if response is valid
+	if(response == null)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		result.put("bot",bot);
+		result.put("text","❌ No response from Workast API. Please check your token.");
+		return result;
+	}
+	// Extract user/team info with null checks
+	userObj = response.get("user");
+	teamObj = response.get("team");
+	// 	appObj = response.get("app");
+	info "User Object: " + userObj;
+	info "Team Object: " + teamObj;
+	if(userObj == null || teamObj == null)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		result.put("bot",bot);
+		result.put("text","❌ Invalid API response. Please check your token.");
+		return result;
+	}
+	workastUserId = userObj.get("id");
+	teamName = teamObj.get("name");
+	// Verify all required fields are present
+	if(workastUserId == null || teamName == null)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		result.put("bot",bot);
+		result.put("text","❌ Incomplete data from Workast API. Missing required fields.");
+		return result;
+	}
+	// Check if user already exists in database
+	query = Map();
+	query.put("criteria","userid=" + user.get("id"));
+	existing = zoho.cliq.getRecords("workastdb",query);
+	info "Existing records check: " + existing;
+	// If user exists, delete old record first
+	if(existing.get("status") == "SUCCESS" && existing.get("list").size() > 0)
+	{
+		oldRecordId = existing.get("list").get(0).get("id");
+		info "Deleting old record: " + oldRecordId;
+		deleteResult = zoho.cliq.deleteRecord("workastdb",oldRecordId);
+		info "Delete result: " + deleteResult;
+	}
+	// Save to DB for future calls
+	values = Map();
+	values.put("teamname",teamName.toString());
+	values.put("workastid",workastUserId.toString());
+	values.put("userid",user.get("id").toString());
+	// Clean and validate the token before storing
+	cleanToken = userToken.toString().trim();
+	info "Token length: " + cleanToken.length();
+	info "Token first 20 chars: " + cleanToken.subString(0,20);
+	values.put("apitoken",cleanToken);
+	info "Values to insert: " + values;
+	info "Values map size: " + values.size();
+	// Create record in database
+	created = zoho.cliq.createRecord("workastdb",values);
+	info "Create Record Result: " + created;
+	info "Create Record Status: " + created.get("status");
+	if(created.get("status") == "SUCCESS")
+	{
+		info "✅ Record created successfully!";
+		// Verify the record was created
+		verifyQuery = Map();
+		verifyQuery.put("criteria","userid=" + user.get("id"));
+		verify = zoho.cliq.getRecords("workastdb",verifyQuery);
+		info "Verification check: " + verify;
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		result.put("bot",bot);
+		result.put("text","🎉 **Workast Account Linked Successfully!**\n\n" + "Hi [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ")! 👋\n" + "Your Workast account is now connected.\n\n" + "🔹 **Team:** " + teamName + "\n" + "🔹 **User ID:** " + workastUserId + "\n\n" + "You can now start using Workast commands!");
+		return result;
+	}
+	else
+	{
+		info "❌ Database insert failed";
+		info "Error details: " + created;
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		result.put("bot",bot);
+		result.put("text","❌ Failed to save to database.\n\nError: " + created.get("message"));
+		return result;
+	}
+}
+catch (e)
+{
+	info "❌ Error occurred: " + e;
+	// 	info "Error type: " + e.getType();
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	result.put("bot",bot);
+	result.put("text","❌ Invalid API Token or error occurred.\n\nPlease verify:\n1. Your API token is correct\n2. You have an active Workast account\n\nError details: " + e);
+	return result;
+}
+return result;

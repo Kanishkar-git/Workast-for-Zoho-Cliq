@@ -1,0 +1,108 @@
+
+try 
+{
+	//---------------------------------------------------
+	// ✅ 1) FETCH USER FROM DB
+	//---------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id"));
+	db = zoho.cliq.getRecords("workastdb",query);
+	if(db.get("status") != "SUCCESS" || db.get("list").size() == 0)
+	{
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("text","🔐 *Account Not Linked*\n\nHey " + user.get("first_name") + ", please link your Workast account to continue.");
+		return response;
+	}
+	//---------------------------------------------------
+	// ✅ 2) GET TOKEN + WORKAST USER ID
+	//---------------------------------------------------
+	apiToken = db.get("list").get(0).get("apitoken");
+	workastId = db.get("list").get(0).get("workastid");
+	headers = Map();
+	headers.put("Authorization","Bearer " + apiToken);
+	headers.put("Accept","application/json");
+	headers.put("Content-Type","application/json");
+	//---------------------------------------------------
+	// ✅ 3) EXTRACT COMMENT TEXT
+	//---------------------------------------------------
+	commentText = "";
+	if(message != null && message.get("content") != null)
+	{
+		commentText = message.get("content").get("text");
+	}
+	//---------------------------------------------------
+	// ✅ 4) FETCH TASKS
+	//---------------------------------------------------
+	tasks = invokeurl
+	[
+		url :"https://api.todobot.io/user/" + workastId + "/task"
+		type :GET
+		headers:headers
+	];
+	//---------------------------------------------------
+	// ✅ 5) BUILD SAFE OPTIONS (HARD LIMIT = 80)
+	//---------------------------------------------------
+	options = list();
+	count = 0;
+	for each  t in tasks
+	{
+		if(count < 80)
+		{
+			taskTitle = t.get("text");
+			if(taskTitle != null && taskTitle.trim() != "")
+			{
+				option = Map();
+				option.put("value",t.get("id"));
+				option.put("label",taskTitle);
+				option.put("thumbnail","https://cdn.workast.io/avatar.png");
+				options.add(option);
+				count = count + 1;
+			}
+		}
+	}
+	//---------------------------------------------------
+	// ✅ 6) HANDLE EMPTY TASK LIST
+	//---------------------------------------------------
+	if(options.size() == 0)
+	{
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("text","📭 No tasks found in your Workast workspace.");
+		return response;
+	}
+	//---------------------------------------------------
+	// ✅ 7) BUILD FORM
+	//---------------------------------------------------
+	inputs = list();
+	inputs.add({"name":"taskId","label":"Task","placeholder":"Choose a Task","multiple":false,"mandatory":true,"type":"dynamic_select","options":options});
+	inputs.add({"label":"Comment","name":"comment","placeholder":"Type your comment here...","value":commentText,"mandatory":true,"type":"textarea","min_length":"0","max_length":"1000"});
+	form = {"type":"form","title":"💬 Add Comment to Workast Task","name":"workastcomment","version":1,"button_label":"Post Comment","actions":{"submit":{"type":"invoke.function","name":"workastcommenthandler"}},"inputs":inputs};
+	return form;
+}
+catch (e)
+{
+	info e;
+	//---------------------------------------------------
+	// ✅ ✅ NEW WORKAST-STYLE ERROR CARD UI
+	//---------------------------------------------------
+	response = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("title","⚠️ Workast Rate Limit Reached");
+	card.put("theme","modern-inline");
+	card.put("thumbnail","https://cdn.workast.io/avatar.png");
+	response.put("card",card);
+	response.put("text","🚦 *Too Many Requests Detected*\n\n" + "Your Workast API usage is temporarily limited.\n\n" + "✅ This is a safety feature to protect your data.\n" + "⏳ Please wait for a short while and try again.\n\n" + "If the issue continues, re-link your Workast account.");
+	return response;
+}
+return Map();

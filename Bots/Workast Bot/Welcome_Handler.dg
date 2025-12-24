@@ -1,0 +1,38 @@
+
+response = Map();
+// newuser is a boolean which defines whether the user is a first time subscriber or not!
+if(newuser)
+{
+	card = Map();
+	card.put("title","Workast for Zoho Cliq");
+	card.put("icon","https://image2url.com/images/1763523494891-f333ea77-1b86-4e39-8454-9041b3889630.png");
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	slidesList = list();
+	slidesList0 = Map();
+	slidesList0.put("type","images");
+	dataList = list();
+	dataList.add("https://image2url.com/images/1764477303206-10c57cfe-8281-46fd-98f0-aea5c968c71d.jpg");
+	slidesList0.put("data",dataList);
+	slidesList.add(slidesList0);
+	response.put("slides",slidesList);
+	response.put("text","Hey *" + user.get("first_name") + "* ! Thanks for subscribing!\n\n" + "👉 Click the **Help** icon to explore all available commands!\n" + "Or simply type **/workast help**.");
+}
+else
+{
+	card = Map();
+	card.put("title","Workast for Zoho Cliq");
+	card.put("icon","https://image2url.com/images/1763523494891-f333ea77-1b86-4e39-8454-9041b3889630.png");
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	slidesList = list();
+	slidesList0 = Map();
+	slidesList0.put("type","images");
+	dataList = list();
+	dataList.add("https://image2url.com/images/1764477303206-10c57cfe-8281-46fd-98f0-aea5c968c71d.jpg");
+	slidesList0.put("data",dataList);
+	slidesList.add(slidesList0);
+	response.put("slides",slidesList);
+	response.put("text","Thank you for subscribing back — we're glad to have you with us again. :wink:");
+}
+return response;

@@ -1,0 +1,100 @@
+
+result = Map();
+info "Create Note – Form Submitted";
+try 
+{
+	// --------------------------------------------
+	// READ FORM VALUES
+	// --------------------------------------------
+	form_values = form.get("values");
+	note_spaceId = form_values.get("spaceid").get("value");
+	note_title = form_values.get("title");
+	info "Selected Space: " + note_spaceId;
+	info "Note Title: " + note_title;
+	// --------------------------------------------
+	// VALIDATION
+	// --------------------------------------------
+	if(note_spaceId == null || note_spaceId == "")
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"⚠ Please select a space."};
+	}
+	if(note_title == null || note_title.trim() == "")
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"⚠ Note title cannot be empty."};
+	}
+	// --------------------------------------------
+	// GET API TOKEN
+	// --------------------------------------------
+	query = {"criteria":"userid=" + user.get("id")};
+	db = zoho.cliq.getRecords("workastdb",query);
+	if(db.get("list").size() == 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"❌ Your Workast account is not linked."};
+	}
+	apiToken = db.get("list").get(0).get("apitoken");
+	// --------------------------------------------
+	// CREATE NOTE  (IMPORTANT → use PARAMETERS not BODY)
+	// --------------------------------------------
+	headers = {"Authorization":"Bearer " + apiToken};
+	body = {"title":note_title};
+	createResp = invokeurl
+	[
+		url :"https://api.todobot.io/list/" + note_spaceId + "/note"
+		type :POST
+		parameters:body
+		headers:headers
+	];
+	info "NOTE RESPONSE = " + createResp;
+	// --------------------------------------------
+	// ❌ PARTICIPANT ERROR HANDLING
+	// --------------------------------------------
+	if(createResp.containsKey("error") && createResp.get("error").get("name") == "ListAccessDeniedError")
+	{
+		spaceLink = "https://open.workast.app/space/" + note_spaceId;
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		card = {"title":"Access Required","theme":"modern-inline"};
+		btn = {"label":"Open Space","action":{"type":"open.url","data":{"web":spaceLink}}};
+		return {"bot":bot,"text":"⚠ You are not a participant of this Space.\nPlease ask the space admin to add you.","card":card,"buttons":{btn}};
+	}
+	// --------------------------------------------
+	// OTHER ERRORS
+	// --------------------------------------------
+	if(createResp.containsKey("error"))
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"❌ Failed to create note.\n\nError: " + createResp};
+	}
+	// --------------------------------------------
+	// SUCCESS UI
+	// --------------------------------------------
+	noteId = createResp.get("id");
+	createdAt = createResp.get("createdAt");
+	createdBy = createResp.get("createdBy").get("name");
+	spaceName = createResp.get("list").get("name");
+	noteLink = createResp.get("list").get("link");
+	if(noteLink == null || noteLink == "")
+	{
+		noteLink = "https://open.workast.app/list/" + note_spaceId;
+	}
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	card = Map();
+	card.put("title","📝 Note Created Successfully");
+	card.put("theme","modern-inline");
+	textBlock = "🎉 **Your note has been created!**\n\n";
+	textBlock = textBlock + "**Title:** " + note_title + "\n";
+	textBlock = textBlock + "**Space:** " + spaceName + "\n";
+	textBlock = textBlock + "**Created By:** " + createdBy + "\n";
+	textBlock = textBlock + "**Created At:** " + createdAt + "\n";
+	btn = {"label":"Open Note","action":{"type":"open.url","data":{"web":noteLink}}};
+	return {"bot":bot,"text":textBlock,"card":card,"buttons":{btn}};
+}
+catch (e)
+{
+	info "❌ Error in createnotesubmit: " + e;
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	return {"bot":bot,"text":"❌ Failed to create note.\n\nError: " + e};
+}
+return result;

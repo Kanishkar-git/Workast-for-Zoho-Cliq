@@ -1,0 +1,85 @@
+
+response = Map();
+try 
+{
+	//---------------------------------------------------
+	// 1) Parse button key: "taskId|spaceId"
+	//---------------------------------------------------
+	buttonKey = arguments.get("key");
+	if(buttonKey == null || buttonKey == "")
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"❌ Invalid request. Missing task information."};
+	}
+	splitIndex = buttonKey.indexOf("|");
+	if(splitIndex < 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"❌ Invalid task key format."};
+	}
+	taskId = buttonKey.substring(0,splitIndex);
+	selectedSpace = buttonKey.substring(splitIndex + 1,buttonKey.length());
+	//---------------------------------------------------
+	// 2) Fetch User Credentials
+	//---------------------------------------------------
+	query = {"criteria":"userid=" + user.get("id").toString()};
+	db = zoho.cliq.getRecords("workastdb",query);
+	rows = db.get("list");
+	if(rows == null || rows.size() == 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"⚠️ Your Workast account is not linked. Please connect first."};
+	}
+	row = rows.get(0);
+	apiToken = row.get("apitoken");
+	headers = {"Authorization":"Bearer " + apiToken,"Accept":"application/json"};
+	//---------------------------------------------------
+	// 3) Fetch task details for title
+	//---------------------------------------------------
+	task = invokeurl
+	[
+		url :"https://api.todobot.io/task/" + taskId
+		type :GET
+		headers:headers
+	];
+	taskTitle = "Task";
+	if(task != null && task.get("text") != null)
+	{
+		taskTitle = task.get("text");
+	}
+	if(taskTitle.length() > 50)
+	{
+		taskTitle = taskTitle.substring(0,47) + "..";
+	}
+	//---------------------------------------------------
+	// 4) Delete the task
+	//---------------------------------------------------
+	deleteResp = invokeurl
+	[
+		url :"https://api.todobot.io/task/" + taskId
+		type :DELETE
+		headers:headers
+	];
+	//---------------------------------------------------
+	// 5) SUCCESS RESPONSE (Your style)
+	//---------------------------------------------------
+	response = Map();
+	response.put("text","Hello " + user.get("first_name") + "\n\n" + "You have successfully *deleted* the task:\n\n" + "*" + taskTitle + "*\n\n" + "Keep rocking🔥\n");
+	bot = Map();
+	bot.put("name","Workast Bot");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("title","🗑️ Task Deleted Successfully");
+	card.put("thumbnail","https://cdn.workast.io/avatar.png");
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	return response;
+}
+catch (e)
+{
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	card = {"title":"Delete Failed ⚠️","theme":"modern-inline"};
+	return {"bot":bot,"card":card,"text":"❌ Failed to delete task: " + e + "\n\nTask may already be deleted or you don’t have permission."};
+}
+return response;

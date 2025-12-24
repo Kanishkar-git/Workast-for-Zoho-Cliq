@@ -1,0 +1,308 @@
+
+// response = Map();
+// try 
+// {
+// 	// Parse the key
+// 	project_id = arguments.get("key");
+// 	info project_id;
+// 	// Get user's API key from workastdb table
+// 	query_zapikey = Map();
+// 	query_zapikey.put("criteria","userid=" + user.get("id"));
+// 	db_apikey = zoho.cliq.getRecords("workastdb",query_zapikey);
+// 	if(db_apikey.get("list").size() == 0)
+// 	{
+// 		response = Map();
+// 		bot = Map();
+// 		bot.put("name","Workast");
+// 		bot.put("image","https://cdn.workast.io/avatar.png");
+// 		response.put("bot",bot);
+// 		response.put("text","❌ Authentication token not found. Please connect your Workast account first.");
+// 		return response;
+// 	}
+// 	apikey = db_apikey.get("list").get(0).get("apitoken");
+// 	// Get the mapping record to delete
+// 	query = Map();
+// 	query.put("criteria","projectid=" + project_id);
+// 	db_records = zoho.cliq.getRecords("workastchannelmapping",query);
+// 	if(db_records.get("list").size() == 0)
+// 	{
+// 		response = Map();
+// 		bot = Map();
+// 		bot.put("name","Workast");
+// 		bot.put("image","https://cdn.workast.io/avatar.png");
+// 		response.put("bot",bot);
+// 		response.put("text","❌ Mapping not found in database.");
+// 		return response;
+// 	}
+// 	// Parse encoded name
+// 	encoded_name = db_records.get("list").get(0).get("name");
+// 	parts = encoded_name.toList("||");
+// 	project_name = parts.get(0);
+// 	channel_name = parts.get(1);
+// 	channel_unique_name = db_records.get("list").get(0).get("channeluniquename");
+// 	record_id = db_records.get("list").get(0).get("id");
+// 	// Step 1: Reset the space name in Workast (remove channel reference)
+// 	workast_url = "https://api.todobot.io/list/" + project_id;
+// 	headers = Map();
+// 	headers.put("Authorization","Bearer " + apikey);
+// 	headers.put("Content-Type","application/json");
+// 	// Reset to original name (remove any encoded channel info)
+// 	body = Map();
+// 	body.put("name",project_name);
+// 	info project_name;
+// 	workast_response = invokeurl
+// 	[
+// 		url :workast_url
+// 		type :PATCH
+// 		parameters:body
+// 		headers:headers
+// 	];
+// 	info "Workast space name reset response: " + workast_response;
+// 	// Step 2: Delete the mapping from database
+// 	db_delete = zoho.cliq.deleteRecord("workastchannelmapping",record_id);
+// 	if(db_delete.get("status").equalsIgnoreCase("SUCCESS"))
+// 	{
+// 		// Step 3: Notify the channel about unmapping
+// 		// 		channel_id = db_records.get("list").get(0).get("channelid");
+// 		try 
+// 		{
+// 			channel_response = Map();
+// 			bot = Map();
+// 			bot.put("name","Workast");
+// 			bot.put("image","https://cdn.workast.io/avatar.png");
+// 			channel_response.put("bot",bot);
+// 			channel_card = Map();
+// 			channel_card.put("theme","modern-inline");
+// 			channel_card.put("thumbnail","https://cdn.workast.io/avatar.png");
+// 			channel_response.put("card",channel_card);
+// 			channel_response.put("text","### 🎉 Workast Integration Disconnected\n\n" + "[" + user.get("first_name") + " " + user.get("last_name") + "](zohoid:" + user.get("zoho_user_id") + ") has successfully disconnected this channel to Workast!\n\n" + "*📦 Workast Space:* " + project_name + "\n" + "*📱 Channel:* #" + channel_unique_name + "\n\n" + "*🔔 You'll receive no longer notifications s\n\n" + "Stay updated on your team's progress in real-time! 🚀");
+// 			channel_notification = zoho.cliq.postToChannel(channel_unique_name,channel_response,"cliqwebhook");
+// 		}
+// 		catch (notify_error)
+// 		{
+// 			info "Failed to send channel notification: " + notify_error;
+// 			// Continue even if notification fails
+// 		}
+// 		// Step 4: Send success response to user
+// 		response = Map();
+// 		bot = Map();
+// 		bot.put("name","Workast");
+// 		bot.put("image","https://cdn.workast.io/avatar.png");
+// 		response.put("bot",bot);
+// 		card = Map();
+// 		card.put("theme","modern-inline");
+// 		card.put("thumbnail","https://cdn.workast.io/avatar.png");
+// 		response.put("card",card);
+// 		content = "### ✅ Unmapping Successful\n\n";
+// 		content = content + "*Workast Space:* " + project_name + "\n";
+// 		content = content + "*Channel:* #" + channel_name + "\n\n";
+// 		content = content + "Changes applied:\n";
+// 		content = content + "• ✓ Channel mapping removed from database\n";
+// 		content = content + "• ✓ Space name reset in Workast\n";
+// 		content = content + "• ✓ Notifications stopped for this channel\n";
+// 		content = content + "• ✓ Channel members notified\n\n";
+// 		content = content + "---\n\n";
+// 		content = content + "### 🗑️ Complete the Removal in Workast\n\n";
+// 		content = content + "To fully remove the integration, delete the webhook in your Workast space:\n\n";
+// 		content = content + "*Step-by-Step Instructions:*\n\n";
+// 		content = content + "1. *Access Workast Space*\n";
+// 		content = content + "   • Navigate to your *" + project_name + "* space in Workast\n\n";
+// 		content = content + "2. *Open Extensions*\n";
+// 		content = content + "   • Click the *⚙️ Settings* icon in the top-right corner\n";
+// 		content = content + "   • Select *Extensions* from the dropdown menu\n";
+// 		content = content + "   • Click on the *Webhooks* tab\n\n";
+// 		content = content + "3. *Locate the Webhook*\n";
+// 		content = content + "   • Find the webhook named *\"Cliq Notifications\"* (or similar)\n";
+// 		content = content + "   • This is the webhook you created for this channel\n\n";
+// 		content = content + "4. *Delete the Webhook*\n";
+// 		content = content + "   • Click the * (three dots)* or *trash icon* next to the webhook\n";
+// 		content = content + "   • Select *Delete* or *Remove*\n";
+// 		content = content + "   • Confirm the deletion when prompted\n\n";
+// 		content = content + "---\n\n";
+// 		content = content + "✅ Once deleted, the integration will be completely removed.\n\n";
+// 		content = content + "💡 You can create a new mapping anytime with `/workast map channel`";
+// 		response.put("text",content);
+// 		return response;
+// 	}
+// 	else
+// 	{
+// 		response = Map();
+// 		bot = Map();
+// 		bot.put("name","Workast");
+// 		bot.put("image","https://cdn.workast.io/avatar.png");
+// 		response.put("bot",bot);
+// 		response.put("text","❌ Failed to delete mapping from database. Please try again.");
+// 		return response;
+// 	}
+// }
+// catch (e)
+// {
+// 	info e;
+// 	response = Map();
+// 	bot = Map();
+// 	bot.put("name","Workast");
+// 	bot.put("image","https://cdn.workast.io/avatar.png");
+// 	response.put("bot",bot);
+// 	response.put("text","❌ Error during unmapping: " + e.toString());
+// 	return response;
+// }
+// return response;
+response = Map();
+try 
+{
+	// Parse the key
+	project_id = arguments.get("key");
+	info project_id;
+	//-------------------------------------------- 
+	// GET USER'S API KEY
+	//--------------------------------------------
+	query_zapikey = Map();
+	query_zapikey.put("criteria","userid=" + user.get("id"));
+	db_apikey = zoho.cliq.getRecords("workastdb",query_zapikey);
+	if(db_apikey.get("list").size() == 0)
+	{
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("text","❌ Authentication token not found. Please connect your Workast account first.");
+		return response;
+	}
+	apikey = db_apikey.get("list").get(0).get("apitoken");
+	//-------------------------------------------- 
+	// GET MAPPING RECORD TO DELETE
+	//--------------------------------------------
+	query = Map();
+	query.put("criteria","projectid=" + project_id);
+	db_records = zoho.cliq.getRecords("workastchannelmapping",query);
+	if(db_records.get("list").size() == 0)
+	{
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("text","❌ Mapping not found in database.");
+		return response;
+	}
+	// Parse encoded name
+	encoded_name = db_records.get("list").get(0).get("name");
+	parts = encoded_name.toList("||");
+	project_name = parts.get(0);
+	channel_name = parts.get(1);
+	channel_unique_name = db_records.get("list").get(0).get("channeluniquename");
+	record_id = db_records.get("list").get(0).get("id");
+	//-------------------------------------------- 
+	// RESET SPACE NAME IN WORKAST
+	//--------------------------------------------
+	workast_url = "https://api.todobot.io/list/" + project_id;
+	headers = Map();
+	headers.put("Authorization","Bearer " + apikey);
+	headers.put("Content-Type","application/json");
+	body = Map();
+	body.put("name",project_name);
+	info project_name;
+	workast_response = invokeurl
+	[
+		url :workast_url
+		type :PATCH
+		parameters:body
+		headers:headers
+	];
+	info "Workast space name reset response: " + workast_response;
+	//-------------------------------------------- 
+	// DELETE MAPPING FROM DATABASE
+	//--------------------------------------------
+	db_delete = zoho.cliq.deleteRecord("workastchannelmapping",record_id);
+	if(db_delete.get("status").equalsIgnoreCase("SUCCESS"))
+	{
+		//-------------------------------------------- 
+		// NOTIFY CHANNEL ABOUT DISCONNECTION
+		//--------------------------------------------
+		try 
+		{
+			disconnect_msg = "[" + user.get("first_name") + " " + user.get("last_name") + "](zohoid:" + user.get("zoho_user_id") + ") has disconnected the Workast integration from this channel. 📦 Workast Space: " + project_name + " | 📱 Channel: #" + channel_unique_name + " | 🔕 Notifications have been disabled. You will no longer receive updates for tasks, assignments, or comments in this channel. Thank you for using Workast!";
+			disconnect_payload = {"text":disconnect_msg,"bot":{"name":"Workast","image":"https://cdn.workast.io/avatar.png"},"card":{"title":"🔌 WORKAST INTEGRATION DISCONNECTED","thumbnail":"https://cdn.workast.io/avatar.png","theme":"modern-inline"}};
+			headers_channel = Map();
+			headers_channel.put("Content-Type","application/json");
+			channel_notification = invokeurl
+			[
+				url :"https://cliq.zoho.com/api/v2/channelsbyname/" + channel_unique_name + "/message?bot_unique_name=workast"
+				type :POST
+				parameters:disconnect_payload.toString()
+				headers:headers_channel
+				connection:"cliqwebhook"
+			];
+			info "Channel notification response: " + channel_notification;
+		}
+		catch (notify_error)
+		{
+			info "Failed to send channel notification: " + notify_error;
+		}
+		//-------------------------------------------- 
+		// SEND SUCCESS RESPONSE TO USER
+		//--------------------------------------------
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		card = Map();
+		card.put("theme","modern-inline");
+		card.put("thumbnail","https://cdn.workast.io/avatar.png");
+		response.put("card",card);
+		content = "### ✅ Unmapping Successful\n\n";
+		content = content + "**Workast Space:** " + project_name + "\n";
+		content = content + "**Channel:** #" + channel_name + "\n\n";
+		content = content + "**Changes applied:**\n";
+		content = content + "• ✓ Channel mapping removed from database\n";
+		content = content + "• ✓ Space name reset in Workast\n";
+		content = content + "• ✓ Notifications stopped for this channel\n";
+		content = content + "• ✓ Channel members notified\n\n";
+		content = content + "---\n\n";
+		content = content + "### 🗑️ Complete the Removal in Workast\n\n";
+		content = content + "To fully remove the integration, delete the webhook in your Workast space:\n\n";
+		content = content + "**Step-by-Step Instructions:**\n\n";
+		content = content + "1. **Access Workast Space**\n";
+		content = content + "   • Navigate to your **" + project_name + "** space in Workast\n\n";
+		content = content + "2. **Open Extensions**\n";
+		content = content + "   • Click the **⚙️ Settings** icon in the top-right corner\n";
+		content = content + "   • Select **Extensions** from the dropdown menu\n";
+		content = content + "   • Click on the **Webhooks** tab\n\n";
+		content = content + "3. **Locate the Webhook**\n";
+		content = content + "   • Find the webhook named **\"Cliq Notifications\"** (or similar)\n";
+		content = content + "   • This is the webhook you created for this channel\n\n";
+		content = content + "4. **Delete the Webhook**\n";
+		content = content + "   • Click the **⋮ (three dots)** or **trash icon** next to the webhook\n";
+		content = content + "   • Select **Delete** or **Remove**\n";
+		content = content + "   • Confirm the deletion when prompted\n\n";
+		content = content + "---\n\n";
+		content = content + "✅ Once deleted, the integration will be completely removed.\n\n";
+		content = content + "💡 You can create a new mapping anytime with `/workast map channel`";
+		response.put("text",content);
+		return response;
+	}
+	else
+	{
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("text","❌ Failed to delete mapping from database. Please try again.");
+		return response;
+	}
+}
+catch (e)
+{
+	info e;
+	response = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	response.put("text","❌ Error during unmapping: " + e.toString());
+	return response;
+}
+return response;

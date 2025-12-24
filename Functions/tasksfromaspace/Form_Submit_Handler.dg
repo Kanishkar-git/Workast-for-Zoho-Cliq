@@ -1,0 +1,253 @@
+
+response = Map();
+try 
+{
+	//---------------------------------------------------
+	// 1) Fetch user from DB
+	//---------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id").toString());
+	db = zoho.cliq.getRecords("workastdb",query);
+	rows = db.get("list");
+	if(rows == null || rows.size() == 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"⚠️ Account not linked. Please connect your Workast account first."};
+	}
+	row = rows.get(0);
+	apiToken = row.get("apitoken");
+	teamName = row.get("teamname");
+	workastUserId = row.get("workastid");
+	headers = Map();
+	headers.put("Authorization","Bearer " + apiToken);
+	headers.put("Accept","application/json");
+	//---------------------------------------------------
+	// 2) Extract selected space from form
+	//---------------------------------------------------
+	info form;
+	formValues = form.get("values");
+	selectedSpace = formValues.get("spaceid").get("value");
+	selectedSpaceName = formValues.get("spaceid").get("label");
+	if(selectedSpace == null || selectedSpace == "")
+	{
+		banner = {"text":"⚠️ No space selected. Please select a space to view tasks.","status":"failure","type":"banner"};
+		return banner;
+	}
+	//---------------------------------------------------
+	// 3) Fetch tasks from selected space
+	//---------------------------------------------------
+	tasks = invokeurl
+	[
+		url :"https://api.todobot.io/list/" + selectedSpace + "/task"
+		type :GET
+		headers:headers
+	];
+	info tasks;
+	//---------------------------------------------------
+	// 4) Handle empty tasks
+	//---------------------------------------------------
+	if(tasks == null || tasks.size() == 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		card = Map();
+		card.put("title","No Tasks Found 📭");
+		card.put("theme","modern-inline");
+		response.put("bot",bot);
+		response.put("card",card);
+		response.put("text","This space is empty! 🎉\n\nUse `/workast create task` in any Cliq chat to create your first task and start organizing your work! 📅✨");
+		info response;
+		return response;
+	}
+	//---------------------------------------------------
+	// 5) Build response with slides (limit to 10 tasks)
+	//---------------------------------------------------
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("title","Tasks in Space 📋");
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	slidesList = list();
+	taskCount = 0;
+	maxTasks = 10;
+	for each  task in tasks
+	{
+		// Limit to 10 tasks for better performance
+		if(taskCount >= maxTasks)
+		{
+			break;
+		}
+		//---------------------------------------------------
+		// Extract and format task details
+		//---------------------------------------------------
+		taskId = task.get("id");
+		if(taskId == null)
+		{
+			continue;
+		}
+		// Task Title
+		taskTitle = task.get("text");
+		if(taskTitle == null || taskTitle == "")
+		{
+			taskTitle = "Untitled Task";
+		}
+		if(taskTitle.length() >= 50)
+		{
+			taskTitle = taskTitle.subString(0,47) + "..";
+		}
+		// Description
+		description = "-";
+		if(task.get("hasDescription") == true)
+		{
+			desc = task.get("description");
+			if(desc != null && desc != "")
+			{
+				description = desc;
+				// Clean HTML entities and tags
+				description = description.replaceAll("&lt;","<").replaceAll("&gt;",">").replaceAll("&amp;","&");
+				description = description.replaceAll("<br>","\n");
+				description = description.replaceAll("<[^>]*>","");
+				description = description.trim();
+				if(description.length() >= 100)
+				{
+					description = description.subString(0,97) + "..";
+				}
+			}
+		}
+		// Due Date
+		dueDate = task.get("dueDate");
+		if(dueDate == null || dueDate == "")
+		{
+			dueDate = "-";
+		}
+		else
+		{
+			// Format date if needed (remove time portion if present)
+			if(dueDate.contains("T"))
+			{
+				dueDate = dueDate.replaceAll("T"," ").subString(0,dueDate.lastIndexOf(":"));
+			}
+		}
+		// Status
+		status = task.get("status");
+		statusEmoji = "⚪";
+		if(status == "done" || status == "completed")
+		{
+			statusEmoji = "✅";
+		}
+		else if(status == "in_progress" || status == "inprogress")
+		{
+			statusEmoji = "🔄";
+		}
+		// Assignees
+		assignedTo = task.get("assignedTo");
+		assigneeNames = "";
+		if(assignedTo != null && assignedTo.size() > 0)
+		{
+			for each  assignee in assignedTo
+			{
+				aName = assignee.get("name");
+				if(aName != null)
+				{
+					assigneeNames = assigneeNames + " " + aName + ",";
+				}
+			}
+			if(assigneeNames.length() >= 1)
+			{
+				assigneeNames = assigneeNames.substring(0,assigneeNames.length() - 1);
+			}
+		}
+		if(assigneeNames == "")
+		{
+			assigneeNames = "-";
+		}
+		if(assigneeNames.length() >= 80)
+		{
+			assigneeNames = assigneeNames.subString(0,77) + "..";
+		}
+		// Task Link
+		taskLink = task.get("link");
+		if(taskLink == null)
+		{
+			taskLink = "https://app.workast.io";
+		}
+		//---------------------------------------------------
+		// SLIDE 1: Text with title + description
+		//---------------------------------------------------
+		slidesList0 = Map();
+		slidesList0.put("type","text");
+		slidesList0.put("title",statusEmoji + " " + taskTitle);
+		slidesList0.put("data","📝 " + description);
+		slidesList.add(slidesList0);
+		//---------------------------------------------------
+		// SLIDE 2: Label with metadata + buttons
+		//---------------------------------------------------
+		slidesList1 = Map();
+		slidesList1.put("type","label");
+		// Data list with metadata
+		dataList = list();
+		dataList0 = Map();
+		dataList0.put("📅 Due Date",dueDate);
+		dataList.add(dataList0);
+		dataList1 = Map();
+		dataList1.put("👤 Assigned To",assigneeNames);
+		dataList.add(dataList1);
+		slidesList1.put("data",dataList);
+		//---------------------------------------------------
+		// BUTTONS
+		//---------------------------------------------------
+		buttonsList = list();
+		// Button 1: View in Workast (external link)
+		buttonsList0 = Map();
+		buttonsList0.put("label","View Task");
+		action0 = Map();
+		action0.put("type","open.url");
+		data0 = Map();
+		data0.put("web",taskLink);
+		action0.put("data",data0);
+		buttonsList0.put("action",action0);
+		buttonsList.add(buttonsList0);
+		// Button 2: More Details (invoke function with + type)
+		buttonsList1 = Map();
+		buttonsList1.put("label","More Details");
+		buttonsList1.put("type","+");
+		action1 = Map();
+		action1.put("type","invoke.function");
+		data1 = Map();
+		data1.put("name","viewtaskdetails");
+		action1.put("data",data1);
+		buttonsList1.put("action",action1);
+		// Key format: "task_details|{taskId}|{spaceId}"
+		buttonsList1.put("key","task_details|" + taskId + "|" + selectedSpace);
+		buttonsList.add(buttonsList1);
+		slidesList1.put("buttons",buttonsList);
+		slidesList.add(slidesList1);
+		taskCount = taskCount + 1;
+	}
+	//---------------------------------------------------
+	// 6) Build final response
+	//---------------------------------------------------
+	totalTasks = tasks.size();
+	displayText = "📋 Showing " + taskCount + " of " + totalTasks + " tasks from: **" + selectedSpaceName + "**";
+	if(totalTasks > maxTasks)
+	{
+		displayText = displayText + "\n\n💡 *Tip: Showing first " + maxTasks + " tasks. Use filters in Workast for more specific results.*";
+	}
+	response.put("slides",slidesList);
+	response.put("text",displayText);
+	// 	response.put("navigation","true");
+	info response;
+	return response;
+}
+catch (e)
+{
+	info "❌ Error in tasksfromaspace: " + e;
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	card = Map();
+	card.put("title","Error ⚠️");
+	card.put("theme","modern-inline");
+	return {"bot":bot,"card":card,"text":"❌ Failed to load tasks: " + e.toString() + "\n\nPlease try again or contact support if the issue persists."};
+}
+return response;

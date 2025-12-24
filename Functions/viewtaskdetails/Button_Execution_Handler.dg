@@ -1,0 +1,462 @@
+
+response = Map();
+try 
+{
+	// 	arguments.get("key") == create_space -> create space form
+	// 	arguments.get("key") == list_task ->  dropdown  form
+	//---------------------------------------------------
+	// 1) Parse input parameters
+	//---------------------------------------------------
+	// 	info arguments;
+	// Check if called from button (arguments) or widget (target)
+	if(arguments.get("key") != null)
+	{
+		// Called from message card button
+		active_tab = arguments.get("key");
+		info active_tab;
+		if(active_tab.startsWith("task_details"))
+		{
+			// Parse: "task_details|{taskId}|{spaceId}"
+			splitIndex = active_tab.indexOf("|");
+			remaining = active_tab.substring(splitIndex + 1,active_tab.length());
+			splitIndex2 = remaining.indexOf("|");
+			taskId = remaining.substring(0,splitIndex2);
+			selectedSpace = remaining.substring(splitIndex2 + 1,remaining.length());
+			// 			info "Task ID: " + taskId;
+			// 			info "Space ID: " + selectedSpace;
+		}
+		else if(active_tab.startsWith("back_to_list"))
+		{
+			// Parse: "back_to_list|{spaceId}"
+			splitIndex = active_tab.indexOf("|");
+			selectedSpace = active_tab.substring(splitIndex + 1,active_tab.length());
+			// 			info "Back to Space ID: " + selectedSpace;
+			// Note: We cannot re-invoke the form directly from here
+			// Instead, show a message prompting user to use the widget again
+			bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+			return {"bot":bot,"text":"⬅️ To return to the task list, please use the Workast widget and select your space again."};
+		}
+		else
+		{
+			bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+			return {"bot":bot,"text":"❌ Invalid request. Please try again."};
+		}
+	}
+	else if(target != null && target.get("id") != null)
+	{
+		// Called from widget button
+		id = target.get("id");
+		info "Widget ID: " + id;
+		splitIndex = id.indexOf("|");
+		if(splitIndex > 0)
+		{
+			active_tab = id.substring(0,splitIndex);
+			remaining = id.substring(splitIndex + 1,id.length());
+			splitIndex2 = remaining.indexOf("|");
+			if(splitIndex2 > 0)
+			{
+				taskId = remaining.substring(0,splitIndex2);
+				selectedSpace = remaining.substring(splitIndex2 + 1,remaining.length());
+			}
+		}
+	}
+	else
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"❌ Missing required parameters."};
+	}
+	//---------------------------------------------------
+	// 2) Fetch user credentials from DB
+	//---------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id").toString());
+	db = zoho.cliq.getRecords("workastdb",query);
+	rows = db.get("list");
+	if(rows == null || rows.size() == 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"⚠️ Account not linked. Please connect your Workast account first."};
+	}
+	row = rows.get(0);
+	apiToken = row.get("apitoken");
+	project = row.get("teamname");
+	headers = Map();
+	headers.put("Authorization","Bearer " + apiToken);
+	headers.put("Accept","application/json");
+	//---------------------------------------------------
+	// 3) Fetch single task details from API
+	//---------------------------------------------------
+	task = invokeurl
+	[
+		url :"https://api.todobot.io/task/" + taskId
+		type :GET
+		headers:headers
+	];
+	// 	info task;
+	if(task == null)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"❌ Could not load task details. The task may have been deleted."};
+	}
+	//---------------------------------------------------
+	// 4) Extract and format all task details
+	//---------------------------------------------------
+	// Task Title
+	taskTitle = task.get("text");
+	if(taskTitle == null || taskTitle == "")
+	{
+		taskTitle = "Untitled Task";
+	}
+	if(taskTitle.length() >= 50)
+	{
+		taskTitle = taskTitle.subString(0,47) + "..";
+	}
+	// Full Description (no truncation for details view)
+	description = task.get("description");
+	if(description == null)
+	{
+		description = "-";
+	}
+	else
+	{
+		desc = description;
+		if(desc != null && desc != "")
+		{
+			description = desc;
+			// Clean HTML entities and tags
+			description = description.replaceAll("&lt;","<").replaceAll("&gt;",">").replaceAll("&amp;","&");
+			description = description.replaceAll("<br>","\n");
+			description = description.replaceAll("<[^>]*>","");
+			description = description.trim();
+			// Allow longer description in detail view
+			if(description.length() >= 300)
+			{
+				description = description.subString(0,297) + "..";
+			}
+		}
+	}
+	// Status
+	status = task.get("status");
+	statusEmoji = "⚪";
+	statusText = "Pending";
+	if(status == "done" || status == "completed")
+	{
+		statusEmoji = "✅";
+		statusText = "Completed";
+	}
+	else if(status == "in_progress" || status == "inprogress")
+	{
+		statusEmoji = "🔄";
+		statusText = "In Progress";
+	}
+	// Creator
+	creatorName = "-";
+	if(task.get("createdBy") != null)
+	{
+		creator = task.get("createdBy");
+		creatorName = creator.get("name");
+		if(creatorName == null || creatorName == "")
+		{
+			creatorName = "-";
+		}
+		else if(creatorName.length() >= 20)
+		{
+			creatorName = creatorName.subString(0,18) + "..";
+		}
+	}
+	// Due Date
+	dueDate = task.get("dueDate");
+	info dueDate;
+	if(dueDate == null || dueDate == "")
+	{
+		dueDate = "-";
+	}
+	else if(dueDate.contains("T"))
+	{
+		dueDate = dueDate.replaceAll("T"," ").subString(0,dueDate.lastIndexOf(":"));
+	}
+	// Start Date
+	startDate = task.get("startDate");
+	if(startDate == null || startDate == "")
+	{
+		startDate = "-";
+	}
+	else if(startDate.contains("T"))
+	{
+		startDate = startDate.replaceAll("T"," ").subString(0,startDate.lastIndexOf(":"));
+	}
+	// Created Date
+	createdAt = task.get("createdAt");
+	if(createdAt == null || createdAt == "")
+	{
+		createdAt = "-";
+	}
+	else if(createdAt.contains("T"))
+	{
+		createdAt = createdAt.replaceAll("T"," ").subString(0,createdAt.lastIndexOf(":"));
+	}
+	// Assignees
+	assignedTo = task.get("assignedTo");
+	assigneeNames = "";
+	if(assignedTo != null && assignedTo.size() > 0)
+	{
+		for each  assignee in assignedTo
+		{
+			aName = assignee.get("name");
+			if(aName != null)
+			{
+				assigneeNames = assigneeNames + " " + aName + ",";
+			}
+		}
+		if(assigneeNames.length() >= 1)
+		{
+			assigneeNames = assigneeNames.substring(0,assigneeNames.length() - 1);
+		}
+	}
+	if(assigneeNames == "")
+	{
+		assigneeNames = "-";
+	}
+	if(assigneeNames.length() >= 100)
+	{
+		assigneeNames = assigneeNames.subString(0,98) + "..";
+	}
+	// Subtasks
+	totalSubTasks = task.get("totalSubTasks");
+	completedSubTasks = task.get("completedSubTasks");
+	if(totalSubTasks == null)
+	{
+		totalSubTasks = 0;
+	}
+	if(completedSubTasks == null)
+	{
+		completedSubTasks = 0;
+	}
+	subtasksText = completedSubTasks + "/" + totalSubTasks;
+	// Comments Count
+	numberOfComments = task.get("numberOfComments");
+	if(numberOfComments == null)
+	{
+		numberOfComments = 0;
+	}
+	// Task Link
+	taskLink = task.get("link");
+	if(taskLink == null)
+	{
+		taskLink = "https://app.workast.io";
+	}
+	// Project Name
+	// 	projectName = "-";
+	// 	if(task.get("projectName") != null && task.get("projectName") != "")
+	// 	{
+	// 		projectName = task.get("projectName");
+	// 	}
+	// Space Name
+	spaceName = "-";
+	spaceName = task.get("list").get("name");
+	//---------------------------------------------------
+	// 5) Build detailed card response
+	//---------------------------------------------------
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	slidesList = list();
+	//---------------------------------------------------
+	// SLIDE 1: Description
+	//---------------------------------------------------
+	slidesList00 = Map();
+	slidesList00.put("type","text");
+	slidesList00.put("data","📝 Description:\n" + description);
+	slidesList.add(slidesList00);
+	//---------------------------------------------------
+	// SLIDE 2: Table with all details
+	//---------------------------------------------------
+	slidesList0 = Map();
+	slidesList0.put("type","table");
+	data = Map();
+	// Table headers
+	headersList = list();
+	headersList.add("Name");
+	headersList.add("Details");
+	data.put("headers",headersList);
+	// Table rows
+	rowsList = list();
+	rowsList0 = Map();
+	rowsList0.put("Name","📦 Project");
+	rowsList0.put("Details",project);
+	rowsList.add(rowsList0);
+	rowsList1 = Map();
+	rowsList1.put("Name","📂 Space");
+	rowsList1.put("Details",spaceName);
+	rowsList.add(rowsList1);
+	rowsList2 = Map();
+	rowsList2.put("Name","📊 Status");
+	rowsList2.put("Details",statusEmoji + " " + statusText);
+	rowsList.add(rowsList2);
+	rowsList3 = Map();
+	rowsList3.put("Name","🚀 Start Date");
+	rowsList3.put("Details",startDate);
+	rowsList.add(rowsList3);
+	rowsList4 = Map();
+	rowsList4.put("Name","📅 Due Date");
+	rowsList4.put("Details",dueDate);
+	rowsList.add(rowsList4);
+	rowsList5 = Map();
+	rowsList5.put("Name","👨‍💼 Created By");
+	rowsList5.put("Details",creatorName);
+	rowsList.add(rowsList5);
+	rowsList6 = Map();
+	rowsList6.put("Name","👤 Assignees");
+	rowsList6.put("Details",assigneeNames);
+	rowsList.add(rowsList6);
+	rowsList7 = Map();
+	rowsList7.put("Name","✅ Subtasks");
+	rowsList7.put("Details",subtasksText);
+	rowsList.add(rowsList7);
+	rowsList8 = Map();
+	rowsList8.put("Name","💬 Comments");
+	rowsList8.put("Details",numberOfComments.toString());
+	rowsList.add(rowsList8);
+	rowsList9 = Map();
+	rowsList9.put("Name","📅 Created At");
+	rowsList9.put("Details",createdAt);
+	rowsList.add(rowsList9);
+	data.put("rows",rowsList);
+	slidesList0.put("data",data);
+	//---------------------------------------------------
+	// Action Buttons
+	//---------------------------------------------------
+	buttonsList = list();
+	// Button 1: View in Workast (external link)
+	// 	buttonsList0 = Map();
+	// 	buttonsList0.put("label","View Task");
+	// 	buttonsList0.put("type","+");
+	// 	action0 = Map();
+	// 	action0.put("type","open.url");
+	// 	data0 = Map();
+	// 	data0.put("web",taskLink);
+	// 	action0.put("data",data0);
+	// 	buttonsList0.put("action",action0);
+	// 	buttonsList.add(buttonsList0);
+	// Button 2: Mark Complete/Incomplete (toggle)
+	// 	buttonsList1 = Map();
+	// 	if(status == "completed" || status == "done")
+	// 	{
+	// 		buttonsList1.put("label","↩️ Mark Incomplete");
+	// 		buttonsList1.put("type","-");
+	// 	}
+	// 	else
+	// 	{
+	// 		buttonsList1.put("label","✅ Mark Complete");
+	// 		buttonsList1.put("type","+");
+	// 	}
+	// 	action1 = Map();
+	// 	action1.put("type","invoke.function");
+	// 	data1 = Map();
+	// 	data1.put("name","toggleTaskStatus");
+	// 	action1.put("data",data1);
+	// 	buttonsList1.put("action",action1);
+	// 	buttonsList1.put("key",taskId + "|" + status + "|" + selectedSpace);
+	// 	buttonsList.add(buttonsList1);
+	// 	// Button 3: Update Task
+	// 	buttonsList2 = Map();
+	// 	buttonsList2.put("label","✏️ Update Task");
+	// 	buttonsList2.put("type","+");
+	// 	action2 = Map();
+	// 	action2.put("type","invoke.function");
+	// 	data2 = Map();
+	// 	data2.put("name","updateTaskForm");
+	// 	action2.put("data",data2);
+	// 	buttonsList2.put("action",action2);
+	// 	buttonsList2.put("key",taskId + "|" + selectedSpace);
+	// 	buttonsList.add(buttonsList2);
+	// 	// Button 4: Delete Task
+	// 	buttonsList3 = Map();
+	// 	buttonsList3.put("label","🗑️ Delete Task");
+	// 	buttonsList3.put("type","-");
+	// 	action3 = Map();
+	// 	action3.put("type","invoke.function");
+	// 	data3 = Map();
+	// 	data3.put("name","deleteTask");
+	// 	action3.put("data",data3);
+	// 	buttonsList3.put("action",action3);
+	// 	buttonsList3.put("key",taskId + "|" + selectedSpace);
+	// 	buttonsList.add(buttonsList3);
+	// 	slidesList0.put("buttons",buttonsList);
+	// 	slidesList.add(slidesList0);
+	// Button 2: Mark Complete/Incomplete (toggle)
+	buttonsList1 = Map();
+	if(status == "completed" || status == "done")
+	{
+		buttonsList1.put("label","↩️ Mark Incomplete");
+		buttonsList1.put("type","-");
+	}
+	else
+	{
+		buttonsList1.put("label","✅ Mark Complete");
+		buttonsList1.put("type","+");
+	}
+	action1 = Map();
+	action1.put("type","invoke.function");
+	data1 = Map();
+	data1.put("name","commonTaskAction");
+	// ← CHANGED
+	action1.put("data",data1);
+	buttonsList1.put("action",action1);
+	buttonsList1.put("key","toggle|" + taskId + "|" + status);
+	// ← CHANGED
+	buttonsList.add(buttonsList1);
+	// Button 3: Update Task (no change needed)
+	// Button 3: Update Task
+	buttonsList2 = Map();
+	buttonsList2.put("label","✏️ Update Task");
+	buttonsList2.put("type","+");
+	action2 = Map();
+	action2.put("type","invoke.function");
+	data2 = Map();
+	data2.put("name","commonTaskAction");
+	// ← CHANGED
+	action2.put("data",data2);
+	buttonsList2.put("action",action2);
+	buttonsList2.put("key","update|" + taskId);
+	// ← CHANGED (removed spaceId)
+	buttonsList.add(buttonsList2);
+	// Button 4: Delete Task
+	buttonsList3 = Map();
+	buttonsList3.put("label","🗑️ Delete Task");
+	buttonsList3.put("type","-");
+	action3 = Map();
+	action3.put("type","invoke.function");
+	data3 = Map();
+	data3.put("name","commonTaskAction");
+	// ← CHANGED
+	action3.put("data",data3);
+	buttonsList3.put("action",action3);
+	buttonsList3.put("key","delete|" + taskId);
+	// ← CHANGED
+	buttonsList.add(buttonsList3);
+	slidesList0.put("buttons",buttonsList);
+	slidesList.add(slidesList0);
+	//---------------------------------------------------
+	// 6) Final response
+	//---------------------------------------------------
+	response.put("slides",slidesList);
+	response.put("text","### " + statusEmoji + " " + taskTitle);
+	response.put("navigation","true");
+	// 	info response;
+	return response;
+}
+catch (e)
+{
+	info "❌ Error in viewtaskdetails: " + e;
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	card = Map();
+	card.put("title","Error ⚠️");
+	card.put("theme","modern-inline");
+	return {"bot":bot,"card":card,"text":"❌ Failed to load task details: " + e.toString() + "\n\nPlease try again or contact support if the issue persists."};
+}
+return response;

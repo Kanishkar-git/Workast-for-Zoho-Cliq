@@ -1,0 +1,187 @@
+
+// mapchannel - Form Submit Handler Function 
+response = Map();
+try 
+{
+	form_data = form.get("values");
+	info form_data;
+	// Extract form data
+	project_id = form_data.get("spaceid").get("value");
+	project_name = form_data.get("spaceid").get("label");
+	channel_id = form_data.get("channel_id").get("id");
+	channel_unique_name = form_data.get("channel_id").get("unique_name");
+	events = form_data.get("events");
+	// Convert events to list for display
+	events_list = List();
+	for each  event in events
+	{
+		events_list.add(event.get("value"));
+	}
+	info events_list;
+	//--------------------------------------------
+	// GET ZAPIKEY (for Cliq webhook)
+	//--------------------------------------------
+	query_zapikey = Map();
+	query_zapikey.put("criteria","userid=" + user.get("id"));
+	db_zapikey = zoho.cliq.getRecords("workastzapikey",query_zapikey);
+	if(db_zapikey.get("list").size() == 0)
+	{
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("text"," Authentication token not found. Please connect your Workast account first.");
+		return response;
+	}
+	zapikey = db_zapikey.get("list").get(0).get("zapikey");
+	// 	apikey = db_zapikey.get("list").get(0).get("apikey"); // Workast API token
+	//--------------------------------------------
+	// CONFIGURATION
+	//--------------------------------------------
+	BOT_UNIQUE_NAME = "workast";
+	query = {"criteria":"userid == " + user.get("id")};
+	dbRecord = zoho.cliq.getRecords("workastwebhookdb",query);
+	webhookbase = "";
+	if(dbRecord.get("list").size() > 0)
+	{
+		webhookbase = dbRecord.get("list").get(0).get("webhookbase");
+	}
+	info "Webhook Base: " + webhookbase;
+	payload_url = webhookbase + "&zapikey=" + zapikey;
+	//--------------------------------------------
+	// CHECK IF ALREADY MAPPED
+	//--------------------------------------------
+	query_check = Map();
+	query_check.put("criteria","projectid=" + project_id);
+	existing_mapping = zoho.cliq.getRecords("workastchannelmapping",query_check);
+	if(existing_mapping.get("list").size() > 0)
+	{
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("text","⚠ This Workast space is already mapped to a channel. Please unmap it first before creating a new mapping.");
+		return response;
+	}
+	//--------------------------------------------
+	// ADD BOT TO CHANNEL FIRST
+	//--------------------------------------------
+	parameters = Map();
+	parameters.put("channel_unique_name",channel_unique_name);
+	add_bot_to_channel = invokeurl
+	[
+		url :"https://cliq.zoho.com/api/v2/bots/" + BOT_UNIQUE_NAME + "/associate"
+		type :POST
+		parameters:toString(parameters)
+		connection:"cliqwebhook"
+	];
+	info add_bot_to_channel;
+	//--------------------------------------------
+	// SAVE MAPPING TO DATABASE
+	//--------------------------------------------
+	values = Map();
+	values.put("projectid",project_id);
+	// 	values.put("webhookid","pending_setup");
+	values.put("channelid",channel_id);
+	values.put("channeluniquename",channel_unique_name);
+	values.put("name",project_name + "||" + channel_unique_name);
+	// Store original name for unmap
+	info values;
+	// Save to database
+	db = zoho.cliq.createRecord("workastchannelmapping",values);
+	if(db.get("status").equalsIgnoreCase("SUCCESS"))
+	{
+		// Format events for display
+		event_format = "";
+		event_instructions = "";
+		for each  event in events_list
+		{
+			event_format = event_format + "   ✓ " + "\n";
+			// Map to Workast event checkbox names
+			if(event == "task_created")
+			{
+				event_instructions = event_instructions + "   ☑ *Receive tasks created*\n";
+			}
+			else if(event == "task_completed")
+			{
+				event_instructions = event_instructions + "   ☑ *Receive tasks completed*\n";
+			}
+			else if(event == "task_assigned")
+			{
+				event_instructions = event_instructions + "   ☑ *Receive task updates* (covers assignments)\n";
+			}
+			else if(event == "task_comment_added")
+			{
+				event_instructions = event_instructions + "   ☑ *Receive task updates* (covers comments)\n";
+			}
+			else if(event == "task_due_date_changed")
+			{
+				event_instructions = event_instructions + "   ☑ *Receive task updates* (covers due date changes)\n";
+			}
+		}
+		//--------------------------------------------
+		// GET LAST MESSAGE ID & CREATE THREAD
+		//--------------------------------------------
+		channel_info = invokeurl
+		[
+			url :"https://cliq.zoho.com/api/v2/channels/" + channel_id
+			type :GET
+			connection:"cliqwebhook"
+		];
+		info channel_info;
+		last_message_id = channel_info.get("last_message_info").get("message_id");
+		info "Last message ID: " + last_message_id;
+		// Update DB with thread ID
+		query = Map();
+		query.put("criteria","projectid=" + project_id);
+		db_records = zoho.cliq.getRecords("workastchannelmapping",query);
+		record_id = db_records.get("list").get(0).get("id");
+		query_update = Map();
+		query_update.put("threadid",last_message_id);
+		db_update = zoho.cliq.updateRecord("workastchannelmapping",record_id,query_update);
+		info db_update;
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		card = Map();
+		card.put("theme","modern-inline");
+		card.put("thumbnail","https://cdn.workast.io/avatar.png");
+		response.put("card",card);
+		// Create buttons
+		buttons = list();
+		buttons.add({"label":"📋 Setup Guide","type":"+","action":{"type":"open.url","data":{"web":"https://www.workast.com/help/article/outgoing-webhooks/"}}});
+		// Button to announce in channel (this will trigger space name encoding)
+		// 		buttons.add({"label":"✅ Complete Setup","type":"+","action":{"type":"invoke.function","data":{"name":"finalizemapping","project_id":project_id}}});
+		buttons.add({"label":"✅ Complete Setup","type":"+","action":{"type":"invoke.function","data":{"name":"notifyChannel"}},"key":project_id + "|" + project_name});
+		response.put("buttons",buttons);
+		response.put("text","### 🎯 Channel Mapping Initiated\n\n" + "Channel: #" + channel_unique_name + "\n" + "Workast Space: " + project_name + "\n" + "Status: Pending webhook configuration\n\n" + "---\n\n" + "We apologize for the inconvenience. Currently, Workast supports only manual webhook integration. Please follow the below instructions.\n\n" + "### 📋 Complete the Integration in Workast\n\n" + "To receive real-time notifications in Cliq, create an Outgoing Webhook in your Workast space:\n\n" + "Step-by-Step Instructions:\n\n" + "1. Access Workast Space\n" + "   • Navigate to your " + project_name + " space in Workast\n\n" + "2. Open Extensions\n" + "   • Click the ⚙ Settings icon in the top-right\n" + "   • Select Extensions from the dropdown\n" + "   • Click on the Webhooks tab\n\n" + "3. Create Outgoing Webhook\n" + "   • Click the + (Plus icon) in the top-right corner\n" + "   • Select Outgoing Webhook from the options\n\n" + "4. Configure Webhook\n" + "   • Name: Cliq Notifications\n" + "   • Target URL: Copy and paste the URL below:\n\n" + "\n" + payload_url + "\n\n\n" + "5. Select Event Types\n" + "   Enable these checkboxes based on your selection:\n" + event_instructions + "\n\n" + "6. Save Configuration\n" + "   • Click the Create button to finalize the webhook\n\n" + "7. Finalize in Cliq\n" + "   • Return here and click the ✅ Complete Setup button above\n" + "   • This will announce the integration in your channel\n\n" + "---\n\n" + "💡 Important: Copy the Target URL exactly as shown. The webhook must be created in Workast before clicking \"Complete Setup\".");
+		return response;
+	}
+	else
+	{
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("text","❌ Failed to create channel mapping. Please try again or contact support.");
+		return response;
+	}
+}
+catch (e)
+{
+	info e;
+	response = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	response.put("text","❌ Error during mapping: " + e.toString());
+	return response;
+}
+response.put("text",form);
+return response;

@@ -1,0 +1,294 @@
+
+// result = Map();
+// try 
+// {
+// 	//---------------------------------------------------
+// 	// GET FORM VALUES
+// 	//---------------------------------------------------
+// 	info "update form";
+// 	info form.get("values");
+// 	formValues = form.get("values");
+// 	taskTitle = formValues.get("title");
+// 	taskDescription = formValues.get("description");
+// 	dueDate = formValues.get("due");
+// 	// Get task ID and space ID from form data
+// 	taskId = formValues.get("taskid");
+// 	// 	spaceId = formValues.get("spaceId");
+// 	info "Task ID: " + taskId;
+// 	// 	info "Space ID: " + spaceId;
+// 	//---------------------------------------------------
+// 	// VALIDATION
+// 	//---------------------------------------------------
+// 	if(taskTitle == null || taskTitle.trim() == "")
+// 	{
+// 		return {"text":"⚠️ Task title is required."};
+// 	}
+// 	//---------------------------------------------------
+// 	// FETCH WORKAST API TOKEN
+// 	//---------------------------------------------------
+// 	query = Map();
+// 	query.put("criteria","userid=" + user.get("id"));
+// 	db = zoho.cliq.getRecords("workastdb",query);
+// 	apitoken = db.get("list").get(0).get("apitoken");
+// 	teamname = db.get("list").get(0).get("teamname");
+// 	headers = Map();
+// 	headers.put("Authorization","Bearer " + apitoken);
+// 	headers.put("Content-Type","application/json");
+// 	//---------------------------------------------------
+// 	// BUILD REQUEST BODY FOR UPDATE
+// 	//---------------------------------------------------
+// 	body = Map();
+// 	body.put("text",taskTitle);
+// 	if(taskDescription != null && taskDescription.trim() != "")
+// 	{
+// 		body.put("description",taskDescription);
+// 	}
+// 	else
+// 	{
+// 		body.put("description","");
+// 	}
+// 	if(dueDate != null && dueDate != "")
+// {
+//     isoDue = dueDate + "T00:00:00.000Z";
+//     body.put("dueDate", isoDue);
+//     body.put("dueDateTimezone", "UTC");     // REQUIRED
+// }
+// else
+// {
+//     body.put("dueDate", null);
+//     body.put("dueDateTimezone", null);      // REQUIRED
+// }
+// 	info "Update Body: " + body;
+// 	//---------------------------------------------------
+// 	// UPDATE TASK IN WORKAST
+// 	//---------------------------------------------------
+// 	apiUrl = "https://api.todobot.io/task/" + taskId;
+// 	taskResponse = invokeurl
+// 	[
+// 		url :apiUrl
+// 		type :PATCH
+// 		parameters:body
+// 		headers:headers
+// 	];
+// // 	info "Update Response: " + taskResponse;
+// 	//---------------------------------------------------
+// 	// PREPARE VALUES FOR UI
+// 	//---------------------------------------------------
+// 	// 	updatedTaskId = taskResponse.get("id");
+// 	// 	updatedTaskTitle = taskResponse.get("text");
+// 	// 	taskLink = taskResponse.get("link");
+// 	// 	if(taskLink == null || taskLink == "")
+// 	// 	{
+// 	// 		taskLink = "https://app.workast.io";
+// 	// 	}
+// 	// 	formattedDueDate = "Not set";
+// 	// 	if(dueDate != null && dueDate != "")
+// 	// 	{
+// 	// 		formattedDueDate = dueDate;
+// 	// 	}
+// 	// 	// Get space name from list info
+// 	// 	listInfo = taskResponse.get("list");
+// 	// 	spaceName = "Unknown Space";
+// 	// 	if(listInfo != null && listInfo.get("name") != null)
+// 	// 	{
+// 	// 		spaceName = listInfo.get("name");
+// 	// 	}
+// 	//---------------------------------------------------
+// 	// BUILD RESPONSE CARD
+// 	//---------------------------------------------------
+// 	response = Map();
+// 	bot = Map();
+// 	bot.put("name","Workast");
+// 	bot.put("image","https://cdn.workast.io/avatar.png");
+// 	response.put("bot",bot);
+// 	card = Map();
+// 	card.put("title","[To-do Updated](" + taskLink + ")");
+// 	card.put("theme","modern-inline");
+// 	card.put("icon","https://cdn.workast.io/avatar.png");
+// 	card.put("thumbnail","https://cdn.workast.io/avatar.png");
+// 	response.put("card",card);
+// 	//---------------------------------------------------
+// 	// BUILD BUTTONS
+// 	//---------------------------------------------------
+// 	buttonsList = list();
+// 	// Button 1: View To-do
+// 	buttonsList0 = Map();
+// 	buttonsList0.put("label","View To-do");
+// 	action0 = Map();
+// 	action0.put("type","open.url");
+// 	data0 = Map();
+// 	data0.put("web",taskLink);
+// 	action0.put("data",data0);
+// 	buttonsList0.put("action",action0);
+// 	buttonsList.add(buttonsList0);
+// 	// Button 2: More Details
+// 	buttonsList1 = Map();
+// 	buttonsList1.put("label","More Details");
+// 	buttonsList1.put("type","+");
+// 	action1 = Map();
+// 	action1.put("type","invoke.function");
+// 	data1 = Map();
+// 	data1.put("name","viewtaskdetails");
+// 	action1.put("data",data1);
+// 	buttonsList1.put("action",action1);
+// 	buttonsList1.put("key","task_details|" + taskId);
+// 	buttonsList.add(buttonsList1);
+// 	response.put("buttons",buttonsList);
+// 	//---------------------------------------------------
+// 	// BUILD SUCCESS MESSAGE TEXT
+// 	//---------------------------------------------------
+// 	response.put("text","Hey [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ") 👋 \nProject Name: **" + teamname + "** \n\nYou've successfully updated the To-do: **" + taskTitle + "** within **" + spaceName + "**. \n📅 Due Date: **" + dueDate + "** \n\nKeep up the great work! 🚀");
+// 	return response;
+// }
+// catch (e)
+// {
+// 	info "Error: " + e;
+// 	bot = Map();
+// 	bot.put("name","Workast");
+// 	bot.put("image","https://cdn.workast.io/avatar.png");
+// 	result.put("bot",bot);
+// 	result.put("text","❌ Error updating task: " + e);
+// 	return result;
+// }
+// // info "update function";
+// return result;
+result = Map();
+try 
+{
+	//---------------------------------------------------
+	// GET FORM VALUES
+	//---------------------------------------------------
+	formValues = form.get("values");
+	taskTitle = formValues.get("title");
+	taskDescription = formValues.get("description");
+	dueDate = formValues.get("due");
+	taskId = formValues.get("taskid");
+	if(taskTitle.trim() == "")
+	{
+		return {"text":"⚠️ Task title is required."};
+	}
+	//---------------------------------------------------
+	// FETCH TOKEN
+	//---------------------------------------------------
+	query = {"criteria":"userid=" + user.get("id")};
+	db = zoho.cliq.getRecords("workastdb",query);
+	apitoken = db.get("list").get(0).get("apitoken");
+	teamname = db.get("list").get(0).get("teamname");
+	headers = {"Authorization":"Bearer " + apitoken,"Content-Type":"application/json"};
+	//---------------------------------------------------
+	// BUILD PATCH BODY
+	//---------------------------------------------------
+	body = Map();
+	body.put("text",taskTitle);
+	if(taskDescription != null && taskDescription.trim() != "")
+	{
+		body.put("description",taskDescription);
+	}
+	else
+	{
+		body.put("description","");
+	}
+	if(dueDate != null && dueDate != "")
+	{
+		isoDue = dueDate + "T00:00:00.000Z";
+		body.put("dueDate",isoDue);
+		body.put("dueDateTimezone","UTC");
+		// REQUIRED
+	}
+	else
+	{
+		body.put("dueDate",null);
+		body.put("dueDateTimezone",null);
+		// REQUIRED
+	}
+	//     body.put("text", taskTitle);
+	//     body.put("description", taskDescription != null ? taskDescription : "");
+	//     if(dueDate != null && dueDate != "")
+	//     {
+	//         iso = dueDate + "T00:00:00.000Z";
+	//         body.put("dueDate", iso);
+	//         body.put("dueDateTimezone", "UTC");
+	//     }
+	//     else
+	//     {
+	//         body.put("dueDate", null);
+	//         body.put("dueDateTimezone", null);
+	//     }
+	//---------------------------------------------------
+	// SEND PATCH
+	//---------------------------------------------------
+	patchUrl = "https://api.todobot.io/task/" + taskId;
+	patchResp = invokeurl
+	[
+		url :patchUrl
+		type :PATCH
+		parameters:body
+		headers:headers
+	];
+	//---------------------------------------------------
+	// IMPORTANT: FETCH UPDATED TASK
+	//---------------------------------------------------
+	fetchUrl = "https://api.todobot.io/task/" + taskId;
+	updatedTask = invokeurl
+	[
+		url :fetchUrl
+		type :GET
+		headers:headers
+	];
+	updatedTaskTitle = updatedTask.get("text");
+	taskLink = updatedTask.get("link");
+	if(taskLink == null || taskLink == "")
+	{
+		taskLink = "https://app.workast.io";
+	}
+	formattedDueDate = "Not set";
+	if(updatedTask.get("dueDate") != null)
+	{
+		formattedDueDate = updatedTask.get("dueDate").subString(0,10);
+	}
+	spaceName = "Unknown Space";
+	listInfo = updatedTask.get("list");
+	if(listInfo != null && listInfo.get("name") != null)
+	{
+		spaceName = listInfo.get("name");
+	}
+	//---------------------------------------------------
+	// BUILD RESPONSE CARD
+	//---------------------------------------------------
+	response = Map();
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	response.put("bot",bot);
+	card = Map();
+	card.put("title","To-do Updated");
+	card.put("theme","modern-inline");
+	card.put("icon","https://cdn.workast.io/avatar.png");
+	card.put("thumbnail","https://cdn.workast.io/avatar.png");
+	response.put("card",card);
+	//---------------------------------------------------
+	// BUTTONS
+	//---------------------------------------------------
+	buttons = list();
+	// Open URL
+	b1 = Map();
+	b1.put("label","View To-do");
+	b1.put("action",{"type":"open.url","data":{"web":taskLink}});
+	buttons.add(b1);
+	// More details
+	b2 = Map();
+	b2.put("label","More Details");
+	b2.put("type","+");
+	b2.put("action",{"type":"invoke.function","data":{"name":"viewtaskdetails"}});
+	b2.put("key","task_details|" + taskId + "|" + listInfo.get("id"));
+	buttons.add(b2);
+	response.put("buttons",buttons);
+	//---------------------------------------------------
+	// MESSAGE TEXT
+	//---------------------------------------------------
+	response.put("text","Hey [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ") 👋\nProject Name: **" + teamname + "**\n\n" + "You've successfully updated the To-do: **" + updatedTaskTitle + "**.\n" + "📅 Due Date: **" + formattedDueDate + "**\n\nKeep up the great work! 🚀");
+	return response;
+}
+catch (e)
+{
+	return {"bot":{"name":"Workast","image":"https://cdn.workast.io/avatar.png"},"text":"❌ Error updating task: " + e};
+}
+return result;

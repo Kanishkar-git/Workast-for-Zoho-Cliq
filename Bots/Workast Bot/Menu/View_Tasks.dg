@@ -1,0 +1,154 @@
+
+response = Map();
+// =======================================================
+// REUSABLE LINK CHECKER - Use in any command handler
+// =======================================================
+try 
+{
+	//----------------------------------------------------
+	// CHECK IF USER IS LINKED
+	//----------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id").toString());
+	db = zoho.cliq.getRecords("workastdb",query);
+	// If user NOT linked -> Ask to link
+	if(db.get("status") != "SUCCESS" || db.get("list").size() == 0)
+	{
+		result = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		result.put("bot",bot);
+		card = Map();
+		card.put("title","🔗 Link Your Workast Account");
+		card.put("theme","modern-inline");
+		result.put("card",card);
+		buttons = List();
+		// Button 1: Get API Token
+		b1 = Map();
+		b1.put("label","Get API Token");
+		b1.put("type","+");
+		a1 = Map();
+		a1.put("type","open.url");
+		d1 = Map();
+		d1.put("web","https://my.workast.com/login/email");
+		a1.put("data",d1);
+		b1.put("action",a1);
+		buttons.add(b1);
+		// Button 2: Link Account
+		b2 = Map();
+		b2.put("label","Link Account");
+		b2.put("type","+");
+		a2 = Map();
+		a2.put("type","invoke.function");
+		d2 = Map();
+		d2.put("name","commonTokenAction");
+		a2.put("data",d2);
+		b2.put("action",a2);
+		b2.put("key","apikeyform");
+		buttons.add(b2);
+		result.put("buttons",buttons);
+		result.put("text","👋 Hey [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ")!\n\n" + "⚠️ **Your Workast account is not linked yet.**\n\n" + "To use Workast with Zoho Cliq, please connect your account:\n\n" + "📝 **Steps:**\n" + "1. Click **'Get API Token'** → Go to Workast settings\n" + "2. Copy your API token\n" + "3. Click **'Link Account'** → Paste the token\n\n" + "💡 Don't have an account? [Sign up here](https://workast.com/signup)");
+		return result;
+	}
+	else
+	{
+		//----------------------------------------------------
+		// USER IS LINKED -> PROCEED WITH YOUR COMMAND
+		//----------------------------------------------------
+		apitoken = db.get("list").get(0).get("apitoken");
+		teamid = db.get("list").get(0).get("workastid");
+		teamname = db.get("list").get(0).get("teamname");
+		try 
+		{
+			headers = Map();
+			headers.put("Authorization","Bearer " + apitoken);
+			spaces = invokeurl
+			[
+				url :"https://api.todobot.io/list"
+				type :GET
+				headers:headers
+			];
+			options = List();
+			for each  s in spaces
+			{
+				spaceName = s.get("name");
+				if(spaceName != null && spaceName.trim().toLowerCase() == "personal tasks")
+				{
+					continue;
+				}
+				if(spaceName == null || spaceName == "")
+				{
+					spaceName = "Untitled Space";
+				}
+				if(spaceName.length() > 50)
+				{
+					spaceName = spaceName.subString(0,47) + "..";
+				}
+				opt = Map();
+				opt.put("value",s.get("id"));
+				opt.put("label",spaceName);
+				opt.put("thumbnail","https://cdn.workast.io/avatar.png");
+				options.add(opt);
+			}
+			if(options.size() == 0)
+			{
+				resp = Map();
+				bot = Map();
+				bot.put("name","Workast");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				resp.put("bot",bot);
+				resp.put("text","⚠ No spaces found for your account.");
+				return resp;
+			}
+			inputs = List();
+			// READ-ONLY PROJECT NAME FIELD
+			inp1 = Map();
+			inp1.put("label","Project Name");
+			inp1.put("name","projectname");
+			inp1.put("type","text");
+			inp1.put("placeholder",teamname);
+			inp1.put("value",teamname);
+			inp1.put("disabled",true);
+			inputs.add(inp1);
+			// SPACE DROPDOWN FIELD
+			inp2 = Map();
+			inp2.put("name","spaceid");
+			inp2.put("label","Select Space");
+			inp2.put("placeholder","Choose a Space");
+			inp2.put("trigger_on_change",false);
+			inp2.put("multiple",false);
+			inp2.put("mandatory",true);
+			inp2.put("type","dynamic_select");
+			inp2.put("options",options);
+			inputs.add(inp2);
+			// FORM ACTION MAP
+			submitAction = Map();
+			submitAction.put("type","invoke.function");
+			submitAction.put("name","tasksfromaspace");
+			actions = Map();
+			actions.put("submit",submitAction);
+			// FINAL FORM
+			form = Map();
+			form.put("type","form");
+			form.put("title","View Tasks From a Space 📝");
+			form.put("name","tasksfromaspace_form");
+			form.put("version",1);
+			form.put("button_label","View Tasks");
+			form.put("actions",actions);
+			form.put("inputs",inputs);
+			return form;
+		}
+		catch (e)
+		{
+			banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+			return banner;
+		}
+	}
+}
+catch (e)
+{
+	banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+	return banner;
+}
+return response;

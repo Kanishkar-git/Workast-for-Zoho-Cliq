@@ -1,0 +1,19 @@
+
+// Suggestion Handler for Workast Bot
+// Returns ordered list of available commands
+options = list();
+// 1. View Tasks
+options.add({"title":"View Tasks","description":"See all tasks inside a selected Workast space.","imageurl":"https://image2url.com/images/1764310552557-d3749622-cef0-40af-a5af-1ebfec01fa1c.png"});
+// 2. Create Space
+options.add({"title":"Create Space","description":"Create a new Workast space/group.","imageurl":"https://image2url.com/images/1764310479824-3fafbaab-b960-469d-9e8b-1f68c8bc60af.png"});
+// 3. Create a Task
+options.add({"title":"Create a Task","description":"Create a new to-do task inside a Workast space.","imageurl":"https://image2url.com/images/1764310511009-e8737df4-d218-4996-b470-fb4b83029b9b.png"});
+// 4. View Note
+options.add({"title":"View Note","description":"Choose a note and view full details.","imageurl":"https://image2url.com/images/1764310054502-5250f6d9-6d0d-45d6-b040-cdbdb294b8d0.png"});
+// 5. Create Note
+options.add({"title":"Create Note","description":"Add a new note inside any Workast space.","imageurl":"https://image2url.com/images/1764310011648-b0282ddb-c239-459d-a9fe-cc6e087a60ce.png"});
+// 6. Map Channel
+options.add({"title":"Map Channel","description":"Map a Zoho Cliq channel to receive Workast notifications.","imageurl":"https://image2url.com/images/1764310092723-b8bff4ad-eebf-4226-b031-4cf03548478e.png"});
+// 7. Unmap Channel
+options.add({"title":"Unmap Channel","description":"Unmap a Zoho Cliq channel from Workast notifications.","imageurl":"https://image2url.com/images/1764310092723-b8bff4ad-eebf-4226-b031-4cf03548478e.png"});
+return options;

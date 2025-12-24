@@ -1,0 +1,139 @@
+
+try 
+{
+	//---------------------------------------------------
+	// ✅ 1) FETCH USER TOKEN
+	//---------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id"));
+	db = zoho.cliq.getRecords("workastdb",query);
+	if(db.get("status") != "SUCCESS" || db.get("list").size() == 0)
+	{
+		response = Map();
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		response.put("bot",bot);
+		response.put("text","Workast account not linked.");
+		return response;
+	}
+	apiToken = db.get("list").get(0).get("apitoken");
+	headers = Map();
+	headers.put("Authorization","Bearer " + apiToken);
+	headers.put("Accept","application/json");
+	headers.put("Content-Type","application/json");
+	//---------------------------------------------------
+	// ✅ 2) READ FORM VALUES (DEBUG ✅)
+	//---------------------------------------------------
+	info "FULL FORM OBJECT:";
+	info form;
+	formValues = form.get("values");
+	info "FORM VALUES:";
+	info formValues;
+	taskId = formValues.get("taskId").get("value");
+	info "FINAL TASK ID STRING:";
+	info taskId;
+	comment = formValues.get("comment");
+	info "TASK ID:";
+	info taskId;
+	info "COMMENT:";
+	info comment;
+	if(taskId == null || comment == null || comment == "")
+	{
+		response = Map();
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		response.put("bot",bot);
+		response.put("text","Task or Comment missing.");
+		return response;
+	}
+	//---------------------------------------------------
+	// ✅ 3) FETCH TASK DETAILS
+	//---------------------------------------------------
+	taskDetails = invokeurl
+	[
+		url :"https://api.todobot.io/task/" + taskId
+		type :GET
+		headers:headers
+	];
+	info "TASK DETAILS:";
+	info taskDetails;
+	numberOfComments = taskDetails.get("numberOfComments");
+	parentId = "";
+	//---------------------------------------------------
+	// ✅ 4) DYNAMIC PARENT RESOLUTION
+	//---------------------------------------------------
+	if(numberOfComments > 0)
+	{
+		parentId = taskDetails.get("lastComment").get("id");
+		info "PARENT FROM lastComment:";
+		info parentId;
+	}
+	else
+	{
+		activitiesRes = invokeurl
+		[
+			url :"https://api.todobot.io/task/" + taskId + "/activity"
+			type :GET
+			headers:headers
+		];
+		info "ACTIVITIES RESPONSE:";
+		info activitiesRes;
+		if(activitiesRes.get("activities") != null && activitiesRes.get("activities").size() > 0)
+		{
+			parentId = activitiesRes.get("activities").get(0).get("id");
+		}
+		else if(activitiesRes.size() > 0)
+		{
+			parentId = activitiesRes.get(0).get("id");
+		}
+		info "ROOT PARENT ID:";
+		info parentId;
+		if(parentId == null || parentId == "")
+		{
+			response = Map();
+			bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+			response.put("bot",bot);
+			response.put("text","❌ Root activity not found for this task.");
+			return response;
+		}
+	}
+	//---------------------------------------------------
+	// ✅ 5) BUILD COMMENT BODY (DEBUG ✅)
+	//---------------------------------------------------
+	body = Map();
+	body.put("value",comment);
+	body.put("mentions",List());
+	body.put("parent",parentId);
+	body.put("type","comment");
+	info "FINAL POST BODY:";
+	info body;
+	//---------------------------------------------------
+	// ✅ 6) POST COMMENT
+	//---------------------------------------------------
+	postRes = invokeurl
+	[
+		url :"https://api.todobot.io/task/" + taskId + "/activity"
+		type :POST
+		body:body.toString()
+		headers:headers
+	];
+	info "POST RESPONSE:";
+	info postRes;
+	//---------------------------------------------------
+	// ✅ 7) SUCCESS RESPONSE
+	//---------------------------------------------------
+	response = Map();
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	response.put("bot",bot);
+	response.put("text","✅ Comment added successfully to Workast!");
+	return response;
+}
+catch (e)
+{
+	info "EXCEPTION:";
+	info e;
+	response = Map();
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	response.put("bot",bot);
+	response.put("text","❌ Failed to add the comment.");
+	return response;
+}
+return Map();

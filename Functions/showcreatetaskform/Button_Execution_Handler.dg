@@ -1,0 +1,124 @@
+
+returnValue = Map();
+try 
+{
+	// ================================
+	// 1. GET USER'S API TOKEN
+	// ================================
+	query = {"criteria":"userid=" + user.get("id")};
+	db = zoho.cliq.getRecords("workastdb",query);
+	if(db.get("status") != "SUCCESS" || db.get("list").size() == 0)
+	{
+		return {"text":"❌ Please link your Workast account first."};
+	}
+	apitoken = db.get("list").get(0).get("apitoken");
+	teamname = db.get("list").get(0).get("teamname");
+	// ================================
+	// 2. FETCH SPACES FROM WORKAST
+	// ================================
+	headers = Map();
+	headers.put("Authorization","Bearer " + apitoken);
+	spaces = invokeurl
+	[
+		url :"https://api.todobot.io/list"
+		type :GET
+		headers:headers
+	];
+	options = List();
+	for each  s in spaces
+	{
+		spaceName = s.get("name");
+		if(spaceName == null || spaceName == "")
+		{
+			spaceName = "Untitled Space";
+		}
+		if(spaceName.length() > 50)
+		{
+			spaceName = spaceName.subString(0,47) + "..";
+		}
+		opt = Map();
+		opt.put("value",s.get("id"));
+		opt.put("label",spaceName);
+		opt.put("thumbnail","https://cdn.workast.io/avatar.png");
+		options.add(opt);
+	}
+	if(options.size() == 0)
+	{
+		resp = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		resp.put("bot",bot);
+		resp.put("text","⚠ No spaces found for your account.");
+		return resp;
+	}
+	// ================================
+	// 3. BUILD THE FORM
+	// ================================
+	inputs = List();
+	// Project (Read-Only)
+	p = Map();
+	p.put("label","Project / Team");
+	p.put("name","project");
+	p.put("type","text");
+	p.put("value",teamname);
+	p.put("disabled",true);
+	inputs.add(p);
+	// Space Selector
+	s = Map();
+	s.put("label","Select Space");
+	s.put("name","spaceId");
+	s.put("placeholder","Choose a space");
+	s.put("type","select");
+	s.put("options",options);
+	s.put("mandatory",true);
+	inputs.add(s);
+	// Task Name
+	t = Map();
+	t.put("label","Task Title");
+	t.put("name","taskTitle");
+	t.put("type","text");
+	t.put("mandatory",true);
+	inputs.add(t);
+	// Task Description
+	d = Map();
+	d.put("label","Description");
+	d.put("name","taskDescription");
+	d.put("type","textarea");
+	d.put("mandatory",false);
+	inputs.add(d);
+	// Due Date
+	dd = Map();
+	dd.put("label","Due Date");
+	dd.put("name","dueDate");
+	dd.put("type","date");
+	dd.put("mandatory",false);
+	inputs.add(dd);
+	// Assignee Email
+	a = Map();
+	a.put("label","Assignee Email");
+	a.put("name","assignee");
+	a.put("type","text");
+	a.put("placeholder","someone@example.com");
+	a.put("mandatory",false);
+	inputs.add(a);
+	// ================================
+	// 4. ACTION BUTTON → submitTaskCreate
+	// ================================
+	action = Map();
+	action.put("type","invoke.function");
+	action.put("name","submitTaskCreate");
+	form = Map();
+	form.put("type","form");
+	form.put("title","Create a New Task");
+	form.put("name","createTaskForm");
+	form.put("button_label","Create Task");
+	form.put("inputs",inputs);
+	form.put("action",action);
+	return form;
+}
+catch (e)
+{
+	return {"text":"❌ Error showiing form: " + spaces};
+}
+return returnValue;

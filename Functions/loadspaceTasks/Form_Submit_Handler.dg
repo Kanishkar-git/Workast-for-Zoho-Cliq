@@ -1,0 +1,128 @@
+
+response = Map();
+try 
+{
+	//--------------------------------------------------
+	// ✅ 0) DEFINE TABS (DELUGE SAFE)
+	//--------------------------------------------------
+	tabs = list();
+	tabs.add({"label":"Dashboard","id":"dashboard"});
+	tabs.add({"label":"Tasks","id":"tasks"});
+	tabs.add({"label":"Deadlines","id":"deadlines"});
+	tabs.add({"label":"Team","id":"team"});
+	tabs.add({"label":"Notes","id":"notes"});
+	//--------------------------------------------------
+	// ✅ 1) GET USER TOKEN
+	//--------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id"));
+	db = zoho.cliq.getRecords("workastdb",query);
+	if(db.get("list").size() == 0)
+	{
+		return {"text":"❌ Workast account not linked."};
+	}
+	apiToken = db.get("list").get(0).get("apitoken");
+	headers = Map();
+	headers.put("Authorization","Bearer " + apiToken);
+	//--------------------------------------------------
+	// ✅ 2) READ SPACE FROM FORM (DELUGE SAFE)
+	//--------------------------------------------------
+	if(form == null || !form.containsKey("values"))
+	{
+		return {"text":"❌ Space selection form data missing."};
+	}
+	formValues = form.get("values");
+	if(!formValues.containsKey("spaceid"))
+	{
+		return {"text":"❌ Space not selected."};
+	}
+	spaceMap = formValues.get("spaceid");
+	selectedSpaceId = spaceMap.get("value");
+	selectedSpaceName = spaceMap.get("label");
+	//--------------------------------------------------
+	// ✅ 3) FETCH TASKS FROM SELECTED SPACE
+	//--------------------------------------------------
+	tasks = invokeurl
+	[
+		url :"https://api.todobot.io/list/" + selectedSpaceId + "/task"
+		type :GET
+		headers:headers
+	];
+	//--------------------------------------------------
+	// ✅ 4) EMPTY SPACE STATE
+	//--------------------------------------------------
+	if(tasks == null || tasks.size() == 0)
+	{
+		elements = list();
+		emptyState = Map();
+		emptyState.put("type","activity");
+		emptyState.put("title","No Tasks Found");
+		emptyState.put("description","This space has no tasks yet.");
+		emptyState.put("image_url","https://cdn.workast.io/avatar.png");
+		elements.add(emptyState);
+		sections = list();
+		sections.add({"id":1,"elements":elements});
+		result = Map();
+		result.put("type","applet");
+		result.put("tabs",tabs);
+		result.put("active_tab","tasks");
+		result.put("sections",sections);
+		return result;
+	}
+	//--------------------------------------------------
+	// ✅ 5) BUILD TASK CARDS (LIMIT = 12)
+	//--------------------------------------------------
+	taskCards = list();
+	count = 0;
+	for each  t in tasks
+	{
+		if(count == 12)
+		{
+			break;
+		}
+		title = if(t.get("text") != null,t.get("text"),"Untitled Task");
+		status = if(t.get("status") != null,t.get("status"),"-");
+		due = if(t.get("dueDate") != null,t.get("dueDate"),"-");
+		link = if(t.get("link") != null,t.get("link"),"https://open.workast.app/");
+		viewBtn = Map();
+		viewBtn.put("label","View");
+		viewBtn.put("type","open.url");
+		viewBtn.put("url",link);
+		btnList = list();
+		btnList.add(viewBtn);
+		card = Map();
+		card.put("title",title);
+		card.put("description","Status: " + status + "\nDue: " + due);
+		card.put("image_url","https://cdn.workast.io/avatar.png");
+		card.put("buttons",btnList);
+		taskCards.add(card);
+		count = count + 1;
+	}
+	//--------------------------------------------------
+	// ✅ 6) CARD WIDGET (DELUGE SAFE)
+	//--------------------------------------------------
+	taskWidget = Map();
+	taskWidget.put("type","cards");
+	taskWidget.put("data",taskCards);
+	taskWidget.put("style",{"view":"gallery","size":"small"});
+	elements = list();
+	elements.add({"type":"title","text":"📝 Tasks From: " + selectedSpaceName});
+	elements.add(taskWidget);
+	elements.add({"type":"text","text":"⚠ Showing only first 12 tasks due to widget limits."});
+	sections = list();
+	sections.add({"id":1,"elements":elements});
+	//--------------------------------------------------
+	// ✅ 7) FINAL RETURN → TASK TAB
+	//--------------------------------------------------
+	result = Map();
+	result.put("type","applet");
+	result.put("tabs",tabs);
+	result.put("active_tab","tasks");
+	result.put("sections",sections);
+	return result;
+}
+catch (e)
+{
+	return {"text":"❌ Failed to load tasks.\n" + e.toString()};
+}
+return Map();

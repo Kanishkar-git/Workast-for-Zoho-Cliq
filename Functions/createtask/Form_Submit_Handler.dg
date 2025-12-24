@@ -1,0 +1,167 @@
+
+result = Map();
+try 
+{
+	//---------------------------------------------------
+	// GET FORM VALUES
+	//---------------------------------------------------
+	formValues = form.get("values");
+	spaceId = formValues.get("spaceid").get("value");
+	spaceName = formValues.get("spaceid").get("label");
+	taskName = formValues.get("taskname");
+	description = formValues.get("description");
+	assignedTo = formValues.get("assigneeid");
+	dueDate = formValues.get("duedate");
+	info form;
+	//---------------------------------------------------
+	// VALIDATION
+	//---------------------------------------------------
+	if(spaceId == null || spaceId == "")
+	{
+		return {"text":"⚠️ Please select a space."};
+	}
+	if(taskName == null || taskName.trim() == "")
+	{
+		return {"text":"⚠️ Task name is required."};
+	}
+	//---------------------------------------------------
+	// FETCH WORKAST API TOKEN
+	//---------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id"));
+	db = zoho.cliq.getRecords("workastdb",query);
+	apitoken = db.get("list").get(0).get("apitoken");
+	teamname = db.get("list").get(0).get("teamname");
+	headers = Map();
+	headers.put("Authorization","Bearer " + apitoken);
+	headers.put("Content-Type","application/json");
+	//---------------------------------------------------
+	// BUILD REQUEST BODY FOR TASK
+	//---------------------------------------------------
+	body = Map();
+	body.put("text",taskName);
+	if(description != null && description.trim() != "")
+	{
+		body.put("description",description);
+	}
+	if(dueDate != null && dueDate != "")
+	{
+		isoDue = dueDate + "T00:00:00.000Z";
+		body.put("dueDate",isoDue);
+	}
+	//---------------------------------------------------
+	// ASSIGNEE LOGIC (Zoho → Workast)
+	//---------------------------------------------------
+	//---------------------------------------------------
+	// SAFE ASSIGNEE LOGIC
+	//---------------------------------------------------
+	try 
+	{
+		if(assignedTo != null && assignedTo.size() > 0)
+		{
+			assignedEmail = assignedTo.get("email");
+			if(assignedEmail != null && assignedEmail != "" && assignedEmail != null)
+			{
+				assignedEmailArray = list();
+				assignedEmailArray.add(assignedEmail);
+				body.put("assignedToEmail",assignedEmailArray);
+			}
+		}
+	}
+	catch (ex)
+	{
+		info "Assignee not provided or invalid → Skipping assignment. Details: " + ex;
+	}
+	info body;
+	//---------------------------------------------------
+	// CREATE TASK IN WORKAST
+	//---------------------------------------------------
+	apiUrl = "https://api.todobot.io/list/" + spaceId + "/task";
+	jsonBody = body.toString();
+	taskResponse = invokeurl
+	[
+		url :apiUrl
+		type :POST
+		parameters:jsonBody
+		headers:headers
+	];
+	info taskResponse;
+	//---------------------------------------------------
+	// PREPARE VALUES FOR UI
+	//---------------------------------------------------
+	taskId = taskResponse.get("id");
+	taskTitle = taskResponse.get("text");
+	taskDescription = taskResponse.get("description");
+	taskLink = taskResponse.get("link");
+	if(taskLink == null || taskLink == "")
+	{
+		taskLink = "https://app.workast.io";
+	}
+	formattedDueDate = "Not set";
+	if(dueDate != null && dueDate != "")
+	{
+		formattedDueDate = dueDate;
+	}
+	assigneeName = "Not assigned";
+	if(assignedTo != null)
+	{
+		assigneeName = assignedTo.get("first_name") + " " + assignedTo.get("last_name");
+	}
+	//---------------------------------------------------
+	// BUILD RESPONSE CARD
+	//---------------------------------------------------
+	response = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("title","🎉New Task Created");
+	card.put("theme","modern-inline");
+	card.put("icon","https://cdn.workast.io/avatar.png");
+	card.put("thumbnail","https://cdn.workast.io/avatar.png");
+	response.put("card",card);
+	//---------------------------------------------------
+	// BUILD BUTTONS
+	//---------------------------------------------------
+	buttonsList = list();
+	// Button 1: View To-do
+	buttonsList0 = Map();
+	buttonsList0.put("label","View To-do");
+	action0 = Map();
+	action0.put("type","open.url");
+	data0 = Map();
+	data0.put("web",taskLink);
+	action0.put("data",data0);
+	buttonsList0.put("action",action0);
+	buttonsList.add(buttonsList0);
+	// Button 2: More Details
+	buttonsList1 = Map();
+	buttonsList1.put("label","More Details");
+	buttonsList1.put("type","+");
+	action1 = Map();
+	action1.put("type","invoke.function");
+	data1 = Map();
+	data1.put("name","viewtaskdetails");
+	action1.put("data",data1);
+	buttonsList1.put("action",action1);
+	buttonsList1.put("key","task_details|" + taskId + "|" + spaceId);
+	buttonsList.add(buttonsList1);
+	response.put("buttons",buttonsList);
+	//---------------------------------------------------
+	// BUILD SUCCESS MESSAGE TEXT
+	//---------------------------------------------------
+	response.put("text","Hey [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ") 👋 \nProject Name: **" + teamname + "** \n\nYou've successfully created a To-do: **" + taskTitle + "** within **" + spaceName + "**. Keep up the great work!");
+	return response;
+}
+catch (e)
+{
+	info "Error: " + e;
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	result.put("bot",bot);
+	result.put("text","❌ Error creating task: " + e);
+	return result;
+}
+return result;

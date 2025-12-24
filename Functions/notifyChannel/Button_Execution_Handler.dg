@@ -1,0 +1,128 @@
+
+// ============================================================================
+// notifyChannel - Finalize Mapping & Announce Integration
+// ============================================================================
+response = Map();
+try 
+{
+	// Get parameters from button action 
+	rawKey = arguments.get("key");
+	parts = rawKey.toList("|");
+	project_id = parts.get(0);
+	project_name = parts.get(1);
+	info "Finalizing mapping for project: " + project_id;
+	//-------------------------------------------- 
+	// GET MAPPING FROM DATABASE 
+	//-------------------------------------------- 
+	query = Map();
+	query.put("criteria","projectid=" + project_id);
+	db_records = zoho.cliq.getRecords("workastchannelmapping",query);
+	if(db_records.get("list").size() == 0)
+	{
+		response.put("text","❌ Mapping not found. Please restart the mapping process.");
+		return response;
+	}
+	mapping = db_records.get("list").get(0);
+	original_space_name = mapping.get("name");
+	channel_unique_name = mapping.get("channeluniquename");
+	record_id = mapping.get("id");
+	project_id = mapping.get("projectid");
+	info "Retrieved from DB - Channel: " + channel_unique_name;
+	// Extract ORIGINAL name if already encoded (in case of re-run) 
+	if(original_space_name.contains("||"))
+	{
+		temp_parts = original_space_name.toList("||");
+		original_space_name = temp_parts.get(0);
+	}
+	//-------------------------------------------- 
+	// GET WORKAST API TOKEN 
+	//--------------------------------------------
+	query_apikey = Map();
+	query_apikey.put("criteria","userid=" + user.get("id"));
+	db_apikey = zoho.cliq.getRecords("workastdb",query_apikey);
+	if(db_apikey.get("list").size() == 0)
+	{
+		response.put("text","❌ Workast API token not found. Please reconnect your account.");
+		return response;
+	}
+	apikey = db_apikey.get("list").get(0).get("apitoken");
+	//-------------------------------------------- 
+	// ENCODE CHANNEL INFO INTO SPACE NAME 
+	//-------------------------------------------- 
+	encoded_space_name = original_space_name + "||" + channel_unique_name;
+	info "Encoding space name to: " + encoded_space_name;
+	//-------------------------------------------- 
+	// UPDATE WORKAST SPACE NAME VIA API 
+	//--------------------------------------------
+	headers = Map();
+	headers.put("Authorization","Bearer " + apikey);
+	headers.put("Content-Type","application/json");
+	body_params = Map();
+	body_params.put("name",encoded_space_name);
+	update_response = invokeurl
+	[
+		url :"https://api.todobot.io/list/" + project_id
+		type :PATCH
+		parameters:body_params
+		headers:headers
+	];
+	info "Workast API Response: " + update_response;
+	//-------------------------------------------- 
+	// UPDATE DATABASE WITH ENCODED NAME 
+	//--------------------------------------------
+	query_update = Map();
+	query_update.put("name",encoded_space_name);
+	db_update = zoho.cliq.updateRecord("workastchannelmapping",record_id,query_update);
+	info "DB updated with encoded name: " + db_update;
+	//-------------------------------------------- 
+	// RE-ASSOCIATE BOT BEFORE POSTING 
+	//-------------------------------------------- 
+	BOT_UNIQUE_NAME = "workast";
+	parameters = Map();
+	parameters.put("channel_unique_name",channel_unique_name);
+	reassociate_bot = invokeurl
+	[
+		url :"https://cliq.zoho.com/api/v2/bots/" + BOT_UNIQUE_NAME + "/associate"
+		type :POST
+		parameters:toString(parameters)
+		connection:"cliqwebhook"
+	];
+	info "Bot re-association result: " + reassociate_bot;
+	//-------------------------------------------- 
+	// POST ACTIVATION MESSAGE IN CHANNEL
+	//-------------------------------------------- 
+	channel_msg = "[" + user.get("first_name") + " " + user.get("last_name") + "](zohoid:" + user.get("zoho_user_id") + ") has successfully connected this channel to Workast. 📦 Workast Space: " + original_space_name + " | 📱 Channel: #" + channel_unique_name + " | 🔔 Notifications enabled for task creation, completion, assignments, updates, comments, and due date changes. Each task will have its own thread for organized discussions. Stay updated on your team's progress in real-time!";
+	channel_payload = {"text":channel_msg,"bot":{"name":"Workast","image":"https://cdn.workast.io/avatar.png"},"card":{"title":"🎉 WORKAST INTEGRATION ACTIVE","thumbnail":"https://cdn.workast.io/avatar.png","theme":"modern-inline"}};
+	headers = Map();
+	headers.put("Content-Type","application/json");
+	post_response = invokeurl
+	[
+		url :"https://cliq.zoho.com/api/v2/channelsbyname/" + channel_unique_name + "/message?bot_unique_name=workast"
+		type :POST
+		parameters:channel_payload.toString()
+		headers:headers
+		connection:"cliqwebhook"
+	];
+	info "Channel post response: " + post_response;
+	//-------------------------------------------- 
+	// PRIVATE CONFIRMATION TO USER 
+	//-------------------------------------------- 
+	response = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("theme","modern-inline");
+	card.put("thumbnail","https://cdn.workast.io/avatar.png");
+	response.put("card",card);
+	response.put("text","### ✅ Integration Complete!\n\nYour Workast space **" + original_space_name + "** is now connected to **#" + channel_unique_name + "**.\n\n**What happens next:**\n• Each task will create its own thread in the channel\n• All updates for a task will appear as replies in that task's thread\n• Your channel stays organized with threaded conversations\n• Notifications are delivered instantly\n\nThe setup announcement has been posted in the channel. Your integration is live! 🎯");
+	return response;
+}
+catch (e)
+{
+	info "Error in notifyChannel: " + e;
+	response.put("text","❌ Error finalizing setup: " + e.toString() + "\n\nPlease ensure the Workast webhook is created and try again.");
+	return response;
+}
+return response;

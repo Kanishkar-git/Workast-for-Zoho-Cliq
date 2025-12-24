@@ -1,0 +1,795 @@
+
+try 
+{
+	query = Map();
+	query.put("criteria","userid=" + user.get("id").toString());
+	db = zoho.cliq.getRecords("workastdb",query);
+	if(db.get("status") == "SUCCESS")
+	{
+		// If user not found in database -> show linking instructions
+		if(db.get("list").size() == 0)
+		{
+			result = Map();
+			bot = Map();
+			bot.put("name","Workast");
+			bot.put("image","https://cdn.workast.io/avatar.png");
+			result.put("bot",bot);
+			buttons = List();
+			// Button: Get API Token (open URL)
+			b1 = Map();
+			b1.put("label","Get API Token");
+			b1.put("type","+");
+			a1 = Map();
+			a1.put("type","open.url");
+			d1 = Map();
+			d1.put("web","https://my.workast.com/login/email");
+			a1.put("data",d1);
+			b1.put("action",a1);
+			buttons.add(b1);
+			// Button: Link Account (invoke function)
+			b2 = Map();
+			b2.put("label","Link Account");
+			b2.put("type","+");
+			a2 = Map();
+			a2.put("type","invoke.function");
+			d2 = Map();
+			d2.put("name","commonTokenAction");
+			a2.put("data",d2);
+			b2.put("action",a2);
+			b2.put("key","apikeyform");
+			buttons.add(b2);
+			result.put("buttons",buttons);
+			result.put("text","👋 Hey " + user.get("first_name") + "!\n\n" + "To get started with Workast inside Zoho Cliq, you must first **link your Workast account**.\n\n" + "🔧 **Follow these quick steps:**\n" + "1️⃣ Create/Log in to your Workast account.\n" + "2️⃣ Click **Your Account Name → Preferences → Generate Token**.\n" + "3️⃣ Copy your **API Token** to a safe place.\n" + "4️⃣ Click **Link Account** and paste the token to finish setup.\n\n" + "🌐 **Workast Login / Signup**\n" + "https://my.workast.com/login/email");
+			return result;
+		}
+		else
+		{
+			recordid = db.get("list").get(0).get("userid");
+			apitoken = db.get("list").get(0).get("apitoken");
+			teamid = db.get("list").get(0).get("workastid");
+			teamname = db.get("list").get(0).get("teamname");
+			info arguments;
+			// Initialize command variable
+			command = "";
+			// Check if user selected from suggestion or typed command
+			try 
+			{
+				// User selected from suggestion handler
+				id = selections.toMap().get("title").toLowerCase();
+				info "Selected from suggestion: " + id;
+				command = id;
+			}
+			catch (e)
+			{
+				// User typed the command
+				if(arguments != null && arguments.trim() != "")
+				{
+					command = arguments.toLowerCase().trim();
+					info "Typed command: " + command;
+				}
+				else
+				{
+					// No command provided - show welcome message
+					info "No command provided";
+					response = Map();
+					bot = Map();
+					bot.put("name","Workast");
+					bot.put("image","https://cdn.workast.io/avatar.png");
+					response.put("bot",bot);
+					card = Map();
+					card.put("theme","modern-inline");
+					response.put("card",card);
+					response.put("text","Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ") 👋\nPlease select an option or click Help to use me! 🌟");
+					return response;
+				}
+			}
+			//----------------------------------------------------
+			// HANDLE EMPTY / INVALID / UNKNOWN COMMANDS
+			//----------------------------------------------------
+			validCommands = {"help","map channel","un map channel","create space","view note","create note","view tasks","create a task"};
+			if(command == null || command.trim() == "" || !validCommands.contains(command))
+			{
+				text = "";
+				text = text + "📋 *Valid Commands:*\n";
+				text = text + "• View Tasks\n";
+				text = text + "• Create Space\n";
+				text = text + "• Create a Task\n";
+				text = text + "• View Note\n";
+				text = text + "• Create Note\n";
+				text = text + "• Map Channel\n";
+				text = text + "• Un map Channel\n";
+				response = Map();
+				response.put("text","👋 Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ")\n\n" + "Please select a valid command or simply click the *Help* icon 😉\n\n" + text);
+				bot = Map();
+				bot.put("name","Workast Bot");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				card = Map();
+				card.put("title","Choose a valid command");
+				card.put("thumbnail","https://cdn.workast.io/avatar.png");
+				card.put("theme","modern-inline");
+				response.put("card",card);
+				return response;
+			}
+			info command;
+			if(command == "map channel")
+			{
+				query_zapikey = Map();
+				query_zapikey.put("criteria","userid=" + user.get("id"));
+				db_query_zapikey = zoho.cliq.getRecords("workastzapikey",query_zapikey);
+				if(db_query_zapikey.get("list").size() == 0)
+				{
+					response = Map();
+					response.put("text","Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ")\n" + "To connect *Workast* and *Cliq*, you need a *webhook token*.\n" + "Please generate one to continue.\n\n" + "*Instructions:*\n" + "*Step 1:* Click on your *Cliq Profile* (top-right)\n\n" + "*Step 2:* Select *Bots & Tools*\n\n" + "*Step 3:* Click *Webhooks* in left sidebar\n\n" + "*Step 4:* Click *Authenticate* and generate token\n\n" + "*Step 5:* Copy and paste it here\n\n" + "⚠️ We sincerely *apologize* for the inconvenience. This setup is required only once. After this, you never need to do it again!");
+					bot = Map();
+					bot.put("name","Workast Bot");
+					bot.put("image","https://cdn.workast.io/avatar.png");
+					response.put("bot",bot);
+					card = Map();
+					card.put("title","⚠️ Need Webhook Token");
+					card.put("thumbnail","https://cdn.workast.io/avatar.png");
+					card.put("theme","modern-inline");
+					response.put("card",card);
+					buttonsList = list();
+					button = Map();
+					button.put("label","Paste Token");
+					button.put("type","+");
+					action = Map();
+					action.put("type","invoke.function");
+					data = Map();
+					data.put("name","commonTokenAction");
+					action.put("data",data);
+					button.put("action",action);
+					button.put("key","zapikeyform");
+					buttonsList.add(button);
+					response.put("buttons",buttonsList);
+					return response;
+				}
+				else
+				{
+					// Zapikey exists, proceed to map channel form
+					content = "Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ") 👋\n\n📢 *Set Up Notifications in Zoho Cliq!*\n\nMap your channel to get instant notifications for:\n✅ New tasks created\n✅ Tasks completed\n✅ Task assignments\n✅ Comments added\n✅ Due dates changed\n\nStay notified and stay productive! 💼🔔\n\nLet's get started!";
+					response = Map();
+					bot = Map();
+					bot.put("name","Workast");
+					bot.put("image","https://cdn.workast.io/avatar.png");
+					response.put("bot",bot);
+					response.put("text",content);
+					buttons = list();
+					btn = Map();
+					btn.put("label","Map Channel");
+					btn.put("type","+");
+					action = Map();
+					action.put("type","invoke.function");
+					data = Map();
+					data.put("name","mapchannelform");
+					action.put("data",data);
+					btn.put("action",action);
+					btn.put("key","generated");
+					buttons.add(btn);
+					response.put("buttons",buttons);
+					return response;
+				}
+			}
+			if(command == "un map channel")
+			{
+				// Get all mappings from database
+				all_mappings = zoho.cliq.getRecords("workastchannelmapping",Map());
+				response = Map();
+				bot = Map();
+				bot.put("name","Workast");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				// Greeting with user's name
+				greeting = "Hey " + user.get("first_name") + " 👋, here are your channel mappings:";
+				response.put("text",greeting);
+				slidesList = list();
+				// Check if there are any mappings
+				if(all_mappings.get("list").size() == 0)
+				{
+					// No mappings found
+					slidesList0 = Map();
+					slidesList0.put("type","text");
+					slidesList0.put("data","No channels have been mapped yet. Start mapping your channels to stay informed and boost productivity! 🚀\n\nUse `/workast map channel` to create your first mapping.");
+					slidesList.add(slidesList0);
+					response.put("slides",slidesList);
+					return response;
+				}
+				// Build slides for each mapping
+				for each  row in all_mappings.get("list")
+				{
+					slidesList0 = Map();
+					slidesList0.put("type","label");
+					encoded_name = row.get("name");
+					nameParts = encoded_name.toList("||");
+					workastName = nameParts.get(0);
+					slidesList0.put("title","Space: " + workastName);
+					// Workast space name
+					// Un Map button
+					buttonsList = list();
+					buttonsList0 = Map();
+					buttonsList0.put("label","Un Map");
+					buttonsList0.put("type","-");
+					action = Map();
+					action.put("type","invoke.function");
+					data = Map();
+					data.put("name","unmapchannel");
+					action.put("data",data);
+					buttonsList0.put("action",action);
+					buttonsList0.put("key",row.get("projectid"));
+					buttonsList.add(buttonsList0);
+					slidesList0.put("buttons",buttonsList);
+					// Data to display
+					dataList = list();
+					// Channel Name
+					dataList0 = Map();
+					dataList0.put("Channel Name","#" + row.get("channeluniquename"));
+					dataList.add(dataList0);
+					slidesList0.put("data",dataList);
+					slidesList.add(slidesList0);
+				}
+				response.put("slides",slidesList);
+				return response;
+			}
+			if(command == "create space")
+			{
+				try 
+				{
+					info teamname;
+					response = Map();
+					response.put("type","form");
+					response.put("title","Create a  new Space");
+					response.put("name","marathon");
+					response.put("button_label","Submit");
+					inputsList = list();
+					projectname = {"label":"Project Name","name":"projectname","type":"text","placeholder":teamname,"value":teamname,"disabled":true};
+					inputsList.add(projectname);
+					inputsList0 = Map();
+					inputsList0.put("label","Space Name");
+					inputsList0.put("name","name");
+					inputsList0.put("placeholder","Type the name of the space");
+					inputsList0.put("min_length","0");
+					inputsList0.put("max_length","100");
+					inputsList0.put("mandatory",false);
+					inputsList0.put("type","text");
+					inputsList.add(inputsList0);
+					inputsList1 = Map();
+					inputsList1.put("label","Description");
+					inputsList1.put("name","description");
+					inputsList1.put("placeholder","Description about the space");
+					inputsList1.put("min_length","0");
+					inputsList1.put("max_length","250");
+					inputsList1.put("mandatory",false);
+					inputsList1.put("type","textarea");
+					inputsList.add(inputsList1);
+					inputsList2 = Map();
+					inputsList2.put("label","Privacy");
+					inputsList2.put("name","privacy");
+					inputsList2.put("placeholder","Select the type");
+					inputsList2.put("multiple",false);
+					inputsList2.put("mandatory",false);
+					inputsList2.put("type","dynamic_select");
+					optionsList = list();
+					optionsList0 = Map();
+					optionsList0.put("value","team");
+					optionsList0.put("label","Team");
+					optionsList.add(optionsList0);
+					optionsList1 = Map();
+					optionsList1.put("value","private");
+					optionsList1.put("label","Private");
+					optionsList.add(optionsList1);
+					inputsList2.put("options",optionsList);
+					inputsList.add(inputsList2);
+					inputsList3 = Map();
+					inputsList3.put("label","Type");
+					inputsList3.put("name","type");
+					inputsList3.put("placeholder","Choose from the list of options");
+					inputsList3.put("multiple",false);
+					inputsList3.put("mandatory",false);
+					inputsList3.put("type","dynamic_select");
+					optionsList = list();
+					optionsList0 = Map();
+					optionsList0.put("value","group");
+					optionsList0.put("label","Group");
+					optionsList.add(optionsList0);
+					optionsList1 = Map();
+					optionsList1.put("value","direct");
+					optionsList1.put("label","Direct");
+					optionsList.add(optionsList1);
+					optionsList2 = Map();
+					optionsList2.put("value","template");
+					optionsList2.put("label","Template");
+					optionsList.add(optionsList2);
+					inputsList3.put("options",optionsList);
+					inputsList.add(inputsList3);
+					response.put("inputs",inputsList);
+					action = Map();
+					action.put("type","invoke.function");
+					action.put("name","createGroup");
+					response.put("action",action);
+					return response;
+				}
+				catch (e)
+				{
+					result = Map();
+					bot = Map();
+					bot.put("name","Workast");
+					bot.put("image","https://cdn.workast.io/avatar.png");
+					result.put("bot",bot);
+					result.put("text","Can't fetching team details. Please try again.");
+					return result;
+				}
+			}
+			if(command == "view note")
+			{
+				try 
+				{
+					// -----------------------------------
+					// FETCH TOKEN
+					// -----------------------------------
+					query = {"criteria":"userid=" + user.get("id")};
+					db = zoho.cliq.getRecords("workastdb",query);
+					if(db.get("list").size() == 0)
+					{
+						bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+						return {"bot":bot,"text":"❌ Your Workast account is not linked."};
+					}
+					apiToken = db.get("list").get(0).get("apitoken");
+					headers = {"Authorization":"Bearer " + apiToken};
+					// -----------------------------------
+					// GET ALL NOTES  →  GET /note
+					// -----------------------------------
+					notesResp = invokeurl
+					[
+						url :"https://api.todobot.io/note"
+						type :GET
+						headers:headers
+					];
+					notesList = notesResp.get("notes");
+					if(notesList == null || notesList.size() == 0)
+					{
+						bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+						return {"bot":bot,"text":"📭 No notes found."};
+					}
+					// -----------------------------------
+					// BUILD DROPDOWN OPTIONS
+					// -----------------------------------
+					options = List();
+					for each  note in notesList
+					{
+						noteIdValue = note.get("id");
+						noteTitle = note.get("title");
+						if(noteTitle == null || noteTitle == "")
+						{
+							noteTitle = "Untitled";
+						}
+						listObj = note.get("list");
+						spaceIdValue = "";
+						if(listObj != null && listObj.containsKey("id"))
+						{
+							spaceIdValue = listObj.get("id");
+						}
+						opt = Map();
+						opt.put("value",noteIdValue);
+						opt.put("label",noteTitle);
+						options.add(opt);
+					}
+					// -----------------------------------
+					// BUILD FORM INPUT
+					// -----------------------------------
+					info options;
+					inputs = List();
+					inp1 = {"name":"noteinfo","label":"Select Note","placeholder":"Choose Note","type":"dynamic_select","multiple":false,"mandatory":true,"options":options};
+					inputs.add(inp1);
+					// -----------------------------------
+					// BUILD FORM
+					// -----------------------------------
+					form = Map();
+					form.put("type","form");
+					form.put("title","Select a Note 📝");
+					form.put("name","notepickerform");
+					form.put("version",1);
+					form.put("button_label","View Details");
+					form.put("inputs",inputs);
+					action = Map();
+					submitBlock = Map();
+					submitBlock.put("type","invoke.function");
+					submitBlock.put("name","getnotedetails");
+					action.put("submit",submitBlock);
+					form.put("actions",action);
+					return form;
+				}
+				catch (e)
+				{
+					bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+					return {"bot":bot,"text":"❌ Error loading notes.\n" + e.toString()};
+				}
+			}
+			if(command == "create note")
+			{
+				try 
+				{
+					// ----------------------------------------------
+					// FETCH USER TOKEN & SPACES
+					// ----------------------------------------------
+					headers = Map();
+					headers.put("Authorization","Bearer " + apitoken);
+					spaces = invokeurl
+					[
+						url :"https://api.todobot.io/list"
+						type :GET
+						headers:headers
+					];
+					options = List();
+					for each  s in spaces
+					{
+						name = if(s.get("name") != null,s.get("name"),"Untitled Space");
+						if(name != null && name.trim().toLowerCase() == "personal tasks")
+						{
+							continue;
+						}
+						opt = {"value":s.get("id"),"label":name};
+						options.add(opt);
+					}
+					if(options.size() == 0)
+					{
+						resp = Map();
+						bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+						resp.put("bot",bot);
+						resp.put("text","⚠ No spaces found. Please create one using `/workast create space`.");
+						return resp;
+					}
+					// ----------------------------------------------
+					// CREATE FORM INPUTS
+					// ----------------------------------------------
+					inputs = List();
+					// Space selector
+					inp1 = {"name":"spaceid","label":"Select Space","placeholder":"Choose a Space","type":"dynamic_select","multiple":false,"mandatory":true,"options":options};
+					inputs.add(inp1);
+					// Title
+					inp2 = Map();
+					inp2.put("label","Note Title");
+					inp2.put("name","title");
+					inp2.put("type","text");
+					inp2.put("mandatory",true);
+					inp2.put("placeholder","Enter Note Title");
+					inputs.add(inp2);
+					// ----------------------------------------------
+					// FORM UI
+					// ----------------------------------------------
+					form = Map();
+					form.put("type","form");
+					form.put("title","Create Note 📝");
+					form.put("name","createnoteform");
+					// ⭐ IMPORTANT HINT
+					form.put("hint","Before creating a note, ensure you have access to the Space.\nOnly members/participants of a Space can create notes.");
+					form.put("version",1);
+					form.put("button_label","Create Note");
+					form.put("inputs",inputs);
+					submitAction = Map();
+					submitAction.put("type","invoke.function");
+					submitAction.put("name","createnotesubmit");
+					actions = Map();
+					actions.put("submit",submitAction);
+					form.put("actions",actions);
+					return form;
+				}
+				catch (e)
+				{
+					resp = Map();
+					bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+					resp.put("bot",bot);
+					resp.put("text","❌ Error preparing note form: " + e.toString());
+					return resp;
+				}
+			}
+			if(command == "view tasks")
+			{
+				try 
+				{
+					headers = Map();
+					headers.put("Authorization","Bearer " + apitoken);
+					spaces = invokeurl
+					[
+						url :"https://api.todobot.io/list"
+						type :GET
+						headers:headers
+					];
+					options = List();
+					for each  s in spaces
+					{
+						spaceName = s.get("name");
+						if(spaceName != null && spaceName.trim().toLowerCase() == "personal tasks")
+						{
+							continue;
+						}
+						if(spaceName == null || spaceName == "")
+						{
+							spaceName = "Untitled Space";
+						}
+						if(spaceName.length() > 50)
+						{
+							spaceName = spaceName.subString(0,47) + "..";
+						}
+						opt = Map();
+						opt.put("value",s.get("id"));
+						opt.put("label",spaceName);
+						opt.put("thumbnail","https://cdn.workast.io/avatar.png");
+						options.add(opt);
+					}
+					if(options.size() == 0)
+					{
+						resp = Map();
+						bot = Map();
+						bot.put("name","Workast");
+						bot.put("image","https://cdn.workast.io/avatar.png");
+						resp.put("bot",bot);
+						resp.put("text","⚠ No spaces found for your account.");
+						return resp;
+					}
+					//options.removeElement("Personal tasks");
+					inputs = List();
+					// READ-ONLY PROJECT NAME FIELD
+					inp1 = Map();
+					inp1.put("label","Project Name");
+					inp1.put("name","projectname");
+					inp1.put("type","text");
+					inp1.put("placeholder",teamname);
+					inp1.put("value",teamname);
+					inp1.put("disabled",true);
+					inputs.add(inp1);
+					// SPACE DROPDOWN FIELD
+					inp2 = Map();
+					inp2.put("name","spaceid");
+					inp2.put("label","Select Space");
+					inp2.put("placeholder","Choose a Space");
+					inp2.put("trigger_on_change",false);
+					inp2.put("multiple",false);
+					inp2.put("mandatory",true);
+					inp2.put("type","dynamic_select");
+					inp2.put("options",options);
+					inputs.add(inp2);
+					inp3 = Map();
+					inp3.put("name","status");
+					inp3.put("label","Task Status");
+					inp3.put("placeholder","Choose status");
+					inp3.put("trigger_on_change",false);
+					inp3.put("multiple",false);
+					inp3.put("mandatory",true);
+					inp3.put("type","select");
+					// Create static options
+					statusOptions = list();
+					// Option 1 — Done
+					statusOptions.add({"label":"Done","value":"done"});
+					// Option 2 — Pending
+					statusOptions.add({"label":"Pending","value":"pending"});
+					inp3.put("options",statusOptions);
+					inputs.add(inp3);
+					// FORM ACTION MAP
+					submitAction = Map();
+					submitAction.put("type","invoke.function");
+					submitAction.put("name","tasksfromaspace");
+					actions = Map();
+					actions.put("submit",submitAction);
+					// FINAL FORM
+					form = Map();
+					form.put("type","form");
+					form.put("title","View Tasks From a Space 📝");
+					form.put("name","tasksfromaspace_form");
+					form.put("version",1);
+					form.put("button_label","View Tasks");
+					form.put("actions",actions);
+					form.put("inputs",inputs);
+					return form;
+				}
+				catch (e)
+				{
+					resp = Map();
+					bot = Map();
+					bot.put("name","Workast");
+					bot.put("image","https://cdn.workast.io/avatar.png");
+					resp.put("bot",bot);
+					resp.put("text","❌ Error fetching spaces.\n" + e.toString());
+					return resp;
+				}
+			}
+			if(command == "create a task")
+			{
+				try 
+				{
+					// 1. GET SPACES (Workast Lists)
+					//--------------------------------------------
+					headers = Map();
+					headers.put("Authorization","Bearer " + apitoken);
+					spaces = invokeurl
+					[
+						url :"https://api.todobot.io/list"
+						type :GET
+						headers:headers
+					];
+					options = List();
+					for each  s in spaces
+					{
+						spaceName = s.get("name");
+						if(spaceName != null && spaceName.trim().toLowerCase() == "personal tasks")
+						{
+							continue;
+						}
+						if(spaceName == null || spaceName == "")
+						{
+							spaceName = "Untitled Space";
+						}
+						if(spaceName.length() > 50)
+						{
+							spaceName = spaceName.subString(0,47) + "..";
+						}
+						opt = Map();
+						opt.put("value",s.get("id"));
+						opt.put("label",spaceName);
+						opt.put("thumbnail","https://cdn.workast.io/avatar.png");
+						options.add(opt);
+					}
+					if(options.size() == 0)
+					{
+						resp = Map();
+						bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+						resp.put("bot",bot);
+						resp.put("text","⚠ No spaces found for your account.");
+						return resp;
+					}
+					//--------------------------------------------
+					// 3. FORM INPUTS
+					//--------------------------------------------
+					inputs = List();
+					// PROJECT NAME (READ ONLY)
+					inp1 = {"label":"Project Name","name":"projectname","type":"text","placeholder":teamname,"value":teamname,"disabled":true};
+					inputs.add(inp1);
+					// SPACE DROPDOWN
+					inp2 = {"name":"spaceid","label":"Select Space","placeholder":"Choose a Space","type":"dynamic_select","multiple":false,"mandatory":true,"options":options};
+					inputs.add(inp2);
+					// TASK TITLE
+					inp3 = {"label":"Task Title","name":"taskname","placeholder":"Enter task name","mandatory":true,"type":"text","min_length":"1","max_length":"200"};
+					inputs.add(inp3);
+					// TASK DESCRIPTION
+					inp4 = {"label":"Description","name":"description","placeholder":"Optional description","mandatory":false,"type":"textarea","min_length":"0","max_length":"500"};
+					inputs.add(inp4);
+					// ASSIGNEE FIELD (native_select → Zoho Contacts)
+					inp6 = Map();
+					inp6.put("label","Assign To");
+					inp6.put("name","assigneeid");
+					inp6.put("placeholder","Choose a user");
+					inp6.put("multiple",false);
+					inp6.put("mandatory",false);
+					inp6.put("type","native_select");
+					inp6.put("data_source","contacts");
+					inputs.add(inp6);
+					// DUE DATE
+					inp5 = {"label":"Due Date","name":"duedate","placeholder":"Select date","mandatory":false,"type":"date"};
+					inputs.add(inp5);
+					//--------------------------------------------
+					// 4. SUBMIT ACTION
+					//--------------------------------------------
+					submitAction = Map();
+					submitAction.put("type","invoke.function");
+					submitAction.put("name","createtask");
+					// Your handler
+					actions = Map();
+					actions.put("submit",submitAction);
+					//--------------------------------------------
+					// 5. FINAL FORM
+					//--------------------------------------------
+					form = Map();
+					form.put("type","form");
+					form.put("title","Create New Task 📝");
+					form.put("name","createtaskform");
+					form.put("version",1);
+					form.put("button_label","Create Task");
+					form.put("inputs",inputs);
+					form.put("actions",actions);
+					return form;
+				}
+				catch (e)
+				{
+					resp = Map();
+					bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+					resp.put("bot",bot);
+					resp.put("text","❌ Error fetching spaces: " + e.toString());
+					return resp;
+				}
+			}
+			if(command == "help")
+			{
+				response = Map();
+				card = Map();
+				card.put("title","Workast Help");
+				card.put("icon","https://cdn.workast.io/avatar.png");
+				card.put("theme","modern-inline");
+				response.put("card",card);
+				slidesList = list();
+				// ================= SLIDE 1 (IMAGE) =================
+				slidesList0 = Map();
+				slidesList0.put("type","images");
+				slidesList0.put("title","Workast for Zoho Cliq");
+				dataList = list();
+				dataList.add("https://image2url.com/images/1764477303206-10c57cfe-8281-46fd-98f0-aea5c968c71d.jpg");
+				slidesList0.put("data",dataList);
+				slidesList.add(slidesList0);
+				// ================= SLIDE 2 (TEXT) =================
+				slidesList1 = Map();
+				slidesList1.put("type","text");
+				slidesList1.put("data","*Workast:* Manage your team's tasks, spaces, and notes inside Zoho Cliq.\n\n" + "### Workast Task Updates 🗓️:\n" + "Get instant notifications for new tasks, updates, and due tasks.\n\n" + "*Switch Account:* Change your connected Workast account.\n");
+				// ================= SWITCH ACCOUNT BUTTON =================
+				buttonsList1 = list();
+				buttonsList0 = Map();
+				buttonsList0.put("label","Switch Account 🔗");
+				buttonsList0.put("type","+");
+				action = Map();
+				action.put("type","invoke.function");
+				data = Map();
+				data.put("name","triggerlinkaccount");
+				action.put("data",data);
+				buttonsList0.put("action",action);
+				buttonsList1.add(buttonsList0);
+				// ================= NEXT PAGE BUTTON =================
+				buttonsList = list();
+				buttonsList0 = Map();
+				buttonsList0.put("label","Next Page ➡️");
+				buttonsList0.put("type","+");
+				action = Map();
+				action.put("type","invoke.function");
+				data = Map();
+				data.put("name","viewcontent");
+				action.put("data",data);
+				buttonsList0.put("action",action);
+				buttonsList0.put("key","help_next_page_1");
+				// same logic as Basecamp
+				buttonsList.add(buttonsList0);
+				// Attach inside slide
+				slidesList1.put("buttons",buttonsList1);
+				slidesList.add(slidesList1);
+				// ================= FINAL RESPONSE =================
+				response.put("slides",slidesList);
+				response.put("text","Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ") 👋 Manage your Workast tasks, spaces, notes, and channel mappings directly from Zoho Cliq!");
+				response.put("buttons",buttonsList);
+				return response;
+			}
+			else
+			{
+				response = Map();
+				response.put("text","👋 Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + "\n" + " Please select a valid command or simply click the help icon ;)");
+				bot = Map();
+				bot.put("name","Workast Bot");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				card = Map();
+				card.put("title","Choose a valid command ");
+				card.put("thumbnail","https://cdn.workast.io/avatar.png");
+				card.put("theme","modern-inline");
+				response.put("card",card);
+				return response;
+			}
+		}
+	}
+	else
+	{
+		result = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		result.put("bot",bot);
+		result.put("text","⚠️ Database error. Please try again later.");
+		return result;
+	}
+}
+catch (e)
+{
+	info "Main Catch: " + e;
+	result = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	result.put("bot",bot);
+	result.put("text","❌ Unexpected error occurred. Please try again.\n\nError: " + e);
+	return result;
+}
+return Map();

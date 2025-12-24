@@ -1,0 +1,256 @@
+
+response = Map();
+info "=== Workast Webhook Received ===";
+info "Body: " + body;
+//--------------------------------------------
+// WEBHOOK VERIFICATION (MANDATORY)
+//--------------------------------------------
+if(body.containsKey("challenge"))
+{
+	info "⚡ Webhook verification challenge received: " + body.get("challenge");
+	return {"challenge":body.get("challenge")};
+}
+try 
+{
+	payload = body.toMap();
+	//--------------------------------------------
+	// EXTRACT EVENT TYPE
+	//--------------------------------------------
+	eventType = ifnull(payload.get("type"),"unknown");
+	info "Event Type: " + eventType;
+	//--------------------------------------------
+	// EXTRACT LIST/SPACE INFO
+	//--------------------------------------------
+	list = payload.get("list");
+	list = if(list != null,list,Map());
+	listId = ifnull(list.get("id"),"");
+	encodedSpaceName = ifnull(list.get("name"),"");
+	spaceLink = ifnull(list.get("link"),"");
+	info "List ID: " + listId;
+	info "Encoded Space Name: " + encodedSpaceName;
+	//--------------------------------------------
+	// DECODE SPACE NAME TO GET CHANNEL INFO
+	//--------------------------------------------
+	if(encodedSpaceName.contains("||") == false)
+	{
+		info "⚠️ Space name not encoded - mapping not finalized";
+		response.put("text","⚠️ Channel mapping not finalized. Please complete setup in Cliq.");
+		return response;
+	}
+	parts = encodedSpaceName.toList("||");
+	if(parts.size() < 2)
+	{
+		banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+		return banner;
+	}
+	originalSpaceName = parts.get(0);
+	channelUniqueName = parts.get(1);
+	info "Original Space Name: " + originalSpaceName;
+	info "Channel Unique Name: " + channelUniqueName;
+	//--------------------------------------------
+	// EXTRACT TASK INFO
+	//--------------------------------------------
+	task = payload.get("task");
+	task = if(task != null,task,Map());
+	taskId = ifnull(task.get("id"),"");
+	taskText = ifnull(task.get("text"),"Untitled Task");
+	taskShortId = ifnull(task.get("shortId"),"");
+	taskStatus = ifnull(task.get("status"),"");
+	taskLink = ifnull(task.get("link"),"");
+	taskDueDate = ifnull(task.get("dueDate"),"");
+	info "Task ID: " + taskId;
+	info "Task Text: " + taskText;
+	//--------------------------------------------
+	// EXTRACT ACTOR INFO
+	//--------------------------------------------
+	actor = payload.get("actor");
+	actor = if(actor != null,actor,Map());
+	actorId = actor.get("id");
+	actorId = if(actorId != null,actorId,Map());
+	actorName = ifnull(actorId.get("name"),"Unknown User");
+	actorEmail = ifnull(actorId.get("email"),"");
+	info "Actor: " + actorName;
+	//--------------------------------------------
+	// BUILD MESSAGE BASED ON EVENT TYPE
+	//--------------------------------------------
+	BOT_UNIQUE_NAME = "workast";
+	msgText = "";
+	cardTitle = "";
+	if(eventType == "task_created")
+	{
+		//========================================
+		// TASK CREATED EVENT
+		//========================================
+		assignedTo = task.get("assignedTo");
+		assigneeNames = "";
+		if(assignedTo != null && assignedTo.size() > 0)
+		{
+			for each  assignee in assignedTo
+			{
+				assigneeName = ifnull(assignee.get("name"),"");
+				if(assigneeName != "")
+				{
+					if(assigneeNames != "")
+					{
+						assigneeNames = assigneeNames + ", ";
+					}
+					assigneeNames = assigneeNames + assigneeName;
+				}
+			}
+		}
+		if(assigneeNames == "")
+		{
+			assigneeNames = "Unassigned";
+		}
+		dueDateDisplay = if(taskDueDate != "","Due: " + taskDueDate,"No due date");
+		cardTitle = "🎉 NEW TASK CREATED";
+		msgText = "✨ " + actorName + " created a new task in " + originalSpaceName + " space. 📝 Task: " + taskText + " | 🆔 #" + taskShortId + " | 👤 Assigned to: " + assigneeNames + " | " + dueDateDisplay + " | 🔗 View task: " + taskLink;
+	}
+	else if(eventType == "task_completed")
+	{
+		//========================================
+		// TASK COMPLETED EVENT
+		//========================================
+		doneBy = task.get("doneBy");
+		doneBy = if(doneBy != null,doneBy,Map());
+		doneByName = ifnull(doneBy.get("name"),actorName);
+		doneAt = task.get("doneAt");
+		completionTime = if(doneAt != null && doneAt != "",doneAt,"Just now");
+		cardTitle = "✅ TASK COMPLETED";
+		msgText = "🎊 " + doneByName + " completed a task in " + originalSpaceName + " space. 📝 Task: " + taskText + " | 🆔 #" + taskShortId + " | ⏰ Completed: " + completionTime + " | 🔗 View task: " + taskLink;
+	}
+	else if(eventType == "task_updated")
+	{
+		//========================================
+		// TASK UPDATED EVENT
+		//========================================
+		updatePatch = payload.get("updatePatch");
+		updatePatch = if(updatePatch != null,updatePatch,Map());
+		changeSummary = "";
+		changeDetails = "";
+		if(updatePatch.get("dueDate") != null)
+		{
+			changeSummary = "changed the due date";
+			newDueDate = ifnull(updatePatch.get("dueDate"),"");
+			changeDetails = "New due date: " + newDueDate;
+		}
+		else if(updatePatch.get("status") != null)
+		{
+			changeSummary = "updated the status";
+			newStatus = ifnull(updatePatch.get("status"),"");
+			changeDetails = "Status: " + newStatus;
+		}
+		else if(updatePatch.get("assignedTo") != null)
+		{
+			changeSummary = "changed the assignment";
+			assignedTo = updatePatch.get("assignedTo");
+			assigneeNames = "";
+			if(assignedTo != null && assignedTo.size() > 0)
+			{
+				for each  assignee in assignedTo
+				{
+					assigneeName = ifnull(assignee.get("name"),"");
+					if(assigneeName != "")
+					{
+						if(assigneeNames != "")
+						{
+							assigneeNames = assigneeNames + ", ";
+						}
+						assigneeNames = assigneeNames + assigneeName;
+					}
+				}
+			}
+			changeDetails = "Assigned to: " + assigneeNames;
+		}
+		else if(updatePatch.get("text") != null)
+		{
+			changeSummary = "updated the task text";
+			changeDetails = "Task text was modified";
+		}
+		else
+		{
+			changeSummary = "made changes";
+			changeDetails = "Task was updated";
+		}
+		cardTitle = "🔄 TASK UPDATED";
+		msgText = "🔔 " + actorName + " " + changeSummary + " in " + originalSpaceName + " space. 📝 Task: " + taskText + " | 🆔 #" + taskShortId + " | ℹ️ " + changeDetails + " | 🔗 View task: " + taskLink;
+	}
+	else if(eventType == "task_assigned")
+	{
+		//========================================
+		// TASK ASSIGNED EVENT
+		//========================================
+		assignedTo = task.get("assignedTo");
+		assigneeNames = "";
+		if(assignedTo != null && assignedTo.size() > 0)
+		{
+			for each  assignee in assignedTo
+			{
+				assigneeName = ifnull(assignee.get("name"),"");
+				if(assigneeName != "")
+				{
+					if(assigneeNames != "")
+					{
+						assigneeNames = assigneeNames + ", ";
+					}
+					assigneeNames = assigneeNames + assigneeName;
+				}
+			}
+		}
+		cardTitle = "👥 TASK ASSIGNED";
+		msgText = "👤 " + actorName + " assigned a task to " + assigneeNames + " in " + originalSpaceName + " space. 📝 Task: " + taskText + " | 🆔 #" + taskShortId + " | 🔗 View task: " + taskLink;
+	}
+	else if(eventType == "task_comment_added")
+	{
+		//========================================
+		// COMMENT ADDED EVENT
+		//========================================
+		updatePatch = payload.get("updatePatch");
+		commentText = "New comment added";
+		if(updatePatch != null)
+		{
+			comment = updatePatch.get("comment");
+			if(comment != null && comment != "")
+			{
+				commentText = comment;
+			}
+		}
+		cardTitle = "💬 COMMENT ADDED";
+		msgText = "💭 " + actorName + " added a comment in " + originalSpaceName + " space. 📝 Task: " + taskText + " | 🆔 #" + taskShortId + " | 💬 Comment: " + commentText + " | 🔗 View task: " + taskLink;
+	}
+	else
+	{
+		//========================================
+		// UNKNOWN EVENT TYPE
+		//========================================
+		cardTitle = "📢 WORKAST UPDATE";
+		msgText = "🔔 " + actorName + " made changes in " + originalSpaceName + " space. 📝 Task: " + taskText + " | 🆔 #" + taskShortId + " | Event: " + eventType + " | 🔗 View task: " + taskLink;
+	}
+	//--------------------------------------------
+	// BUILD MESSAGE PAYLOAD
+	//--------------------------------------------
+	message_payload = {"text":msgText,"bot":{"name":"Workast","image":"https://cdn.workast.io/avatar.png"},"card":{"title":cardTitle,"thumbnail":"https://cdn.workast.io/avatar.png","theme":"modern-inline"}};
+	//--------------------------------------------
+	// POST TO CHANNEL
+	//--------------------------------------------
+	info "📤 Posting notification to channel: " + channelUniqueName;
+	headers = Map();
+	headers.put("Content-Type","application/json");
+	post_response = invokeurl
+	[
+		url :"https://cliq.zoho.com/api/v2/channelsbyname/" + channelUniqueName + "/message?bot_unique_name=" + BOT_UNIQUE_NAME
+		type :POST
+		parameters:message_payload.toString()
+		headers:headers
+		connection:"cliqwebhook"
+	];
+	info "✅ Post response: " + post_response;
+	response.put("text","✅ Notification posted successfully");
+	return response;
+}
+catch (e)
+{
+	banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+	return banner;
+}
+return response;

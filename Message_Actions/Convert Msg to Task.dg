@@ -1,0 +1,233 @@
+
+// --------------------------------------------------
+// MESSAGE ACTION: CONVERT TO WORKAST TASK (AI)
+// ✅ FINAL SAFE VERSION – NO HANGING – USER VALIDATION (PRODUCTION)
+// --------------------------------------------------
+response = Map();
+successBanner = Map();
+successBanner.put("type","banner");
+successBanner.put("status","success");
+errorBanner = Map();
+errorBanner.put("type","banner");
+errorBanner.put("status","failure");
+// ✅ 1. Validate Message
+if(!message.containsKey("text"))
+{
+	errorBanner.put("text","❌ Only text messages can be converted into tasks.");
+	return errorBanner;
+}
+messageText = message.get("text");
+// ✅ 2. Fetch Workast Token
+query = Map();
+query.put("criteria","userid=" + user.get("id"));
+db = zoho.cliq.getRecords("workastdb",query);
+if(db.get("list").isEmpty())
+{
+	errorBanner.put("text","❌ Please link your Workast account first.");
+	return errorBanner;
+}
+apitoken = db.get("list").get(0).get("apitoken");
+headers = Map();
+headers.put("Authorization","Bearer " + apitoken);
+headers.put("Content-Type","application/json");
+// ✅ 3. Gemini Prompt (STRICT JSON WITH NULL FALLBACK)
+prompt = "Extract task info in STRICT valid JSON only.\n";
+prompt = prompt + "Rules:\n";
+prompt = prompt + "1. If due date is NOT mentioned, set \"dueDate\": null\n";
+prompt = prompt + "2. If assignee is NOT mentioned, set \"assigneeName\": null\n";
+prompt = prompt + "3. date format MUST be YYYY-MM-DD only\n";
+prompt = prompt + "4. Return ONLY JSON. No explanation.\n\n";
+prompt = prompt + "{ \"title\": \"\", \"space\": \"\", \"dueDate\": null, \"assigneeName\": null }\n\n";
+prompt = prompt + "Message:\n" + messageText;
+// ✅ 4. Gemini API Call (TIMEOUT SAFE)
+GEMINI_API_KEY = "AIzaSyC6NktkmKRpJTMpe10HaLplzAqBXkt7Kgw";
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
+part = {"text":prompt};
+partsList = list();
+partsList.add(part);
+contentItem = {"parts":partsList};
+contentsList = list();
+contentsList.add(contentItem);
+payload = {"contents":contentsList};
+gRes = null;
+try 
+{
+	gRes = invokeurl
+	[
+		url :GEMINI_URL
+		type :POST
+		parameters:payload.toString()
+		headers:{"Content-Type":"application/json"}
+	];
+}
+catch (e)
+{
+	errorBanner.put("text","❌ AI timeout. Please try again.");
+	return errorBanner;
+}
+if(gRes == null || !gRes.containsKey("candidates"))
+{
+	response.put("text","❌ AI failed to extract task info.");
+	return response;
+}
+aiText = gRes.get("candidates").get(0).get("content").get("parts").get(0).get("text");
+cleaned = aiText.replaceAll("```json","").replaceAll("```","").trim();
+try 
+{
+	aiData = cleaned.toMap();
+}
+catch (e)
+{
+	errorBanner.put("text","❌ AI returned invalid JSON format.");
+	return errorBanner;
+}
+// ✅ 5. Extract Fields
+taskTitle = aiData.get("title");
+spaceName = aiData.get("space");
+dueDate = aiData.get("dueDate");
+assigneeName = aiData.get("assigneeName");
+if(taskTitle == null || taskTitle.trim() == "")
+{
+	errorBanner.put("text","❌ AI could not detect a valid task title.");
+	return errorBanner;
+}
+// ✅ SAFE DEFAULT: if dueDate is null → auto set tomorrow
+if(dueDate == null || dueDate.trim() == "")
+{
+	dueDate = zoho.currentdate.addDay(1).toString("yyyy-MM-dd");
+}
+// ✅ Auto Description
+taskDesc = "Complete the task: " + taskTitle;
+// ✅ 6. Fetch Workast Spaces
+try 
+{
+	spaces = invokeurl
+	[
+		url :"https://api.todobot.io/list"
+		type :GET
+		headers:headers
+	];
+}
+catch (e)
+{
+	errorBanner.put("text","❌ Unable to fetch Workast spaces.");
+	return errorBanner;
+}
+spaceId = "";
+for each  s in spaces
+{
+	if(spaceName != null && s.get("name") != null && s.get("name").toLowerCase() == spaceName.toLowerCase())
+	{
+		spaceId = s.get("id");
+		spaceName = s.get("name");
+		break;
+	}
+}
+if(spaceId == "")
+{
+	spaceId = spaces.get(0).get("id");
+	spaceName = spaces.get(0).get("name");
+}
+// ✅ 7. Fetch Team Users
+try 
+{
+	teamResponse = invokeurl
+	[
+		url :"https://api.todobot.io/user?status=active"
+		type :GET
+		headers:headers
+	];
+}
+catch (e)
+{
+	errorBanner.put("text","❌ Team lookup failed.");
+	return errorBanner;
+}
+// ✅ 8. STRONG USER MATCHING (WITH NULL & INVALID USER HANDLING)
+assignedUserId = null;
+assignedUserEmail = null;
+suggestList = list();
+assigneeLower = "";
+if(assigneeName != null && assigneeName.trim() != "")
+{
+	assigneeLower = assigneeName.toLowerCase().trim();
+}
+for each  m in teamResponse
+{
+	nameVal = "";
+	if(m.get("name") != null)
+	{
+		nameVal = m.get("name").toLowerCase().trim();
+		suggestList.add(m.get("name"));
+	}
+	if(assigneeLower != "" && (nameVal == assigneeLower || nameVal.contains(assigneeLower) || assigneeLower.contains(nameVal)))
+	{
+		assignedUserId = m.get("id");
+		assignedUserEmail = m.get("email");
+		break;
+	}
+}
+// ✅ 9. IF USER NAME GIVEN BUT NOT FOUND → THROW ERROR
+if(assigneeLower != "" && assignedUserId == null)
+{
+	errorBanner.put("text","❌ *Mentioned user is not in the team.*\n\n" + "✅ Available users: " + suggestList.toString());
+	return errorBanner;
+}
+// ✅ 10. FINAL WORKAST BODY (ALLOW UNASSIGNED TASK)
+taskBody = Map();
+taskBody.put("text",taskTitle);
+taskBody.put("description",taskDesc);
+taskBody.put("startDate",zoho.currentdate.toString("yyyy-MM-dd") + "T10:00:00.000Z");
+taskBody.put("dueDate",dueDate + "T00:00:00.000Z");
+taskBody.put("dueDateTimezone","UTC");
+taskBody.put("dueDateTime",dueDate + "T14:00:00.000Z");
+taskBody.put("listPosition",143221);
+// ✅ ✅ ONLY ADD ASSIGNEE IF PRESENT
+if(assignedUserId != null)
+{
+	assignedToArr = list();
+	assignedToArr.add(assignedUserId);
+	assignedEmailArr = list();
+	assignedEmailArr.add(assignedUserEmail);
+	taskBody.put("assignedTo",assignedToArr);
+	taskBody.put("assignedToEmail",assignedEmailArr);
+}
+// ✅ 11. CREATE TASK
+try 
+{
+	created = invokeurl
+	[
+		url :"https://api.todobot.io/list/" + spaceId + "/task"
+		type :POST
+		parameters:taskBody.toString()
+		headers:headers
+	];
+}
+catch (e)
+{
+	errorBanner.put("text","❌ Workast API timeout.");
+	return errorBanner;
+}
+if(created == null || !created.containsKey("id"))
+{
+	errorBanner.put("text","❌ Workast rejected task creation.");
+	return errorBanner;
+}
+// ✅ 12. CORRECT OPEN LINK
+taskLink = "";
+if(created.containsKey("link"))
+{
+	taskLink = created.get("link");
+}
+else
+{
+	taskLink = "https://open.workast.app/task/" + created.get("id");
+}
+// ✅ 13. FINAL SUCCESS OUTPUT
+bot = {"name":"Workast AI","image":"https://cdn.workast.io/avatar.png"};
+response.put("bot",bot);
+card = {"title":"✅ Task Created Successfully","theme":"modern-inline"};
+response.put("card",card);
+assignedFinal = if(assignedUserEmail != null,assignedUserEmail,"Not Assigned");
+response.put("text","📝 *Title:* " + taskTitle + "\n" + "📂 *Space:* " + spaceName + "\n" + "📄 *Description:* " + taskDesc + "\n" + "📅 *Due Date:* " + dueDate + "\n" + "👤 *Assigned To:* " + assignedFinal + "\n\n" + "🔗 *Task Link:* " + taskLink);
+return response;

@@ -1,0 +1,82 @@
+
+result = Map();
+try 
+{
+	info form;
+	values = form.get("values");
+	noteId = values.get("noteinfo").get("value");
+	info noteId;
+	//----------------------------------------------------
+	// FETCH TOKEN
+	//----------------------------------------------------
+	query = {"criteria":"userid=" + user.get("id")};
+	db = zoho.cliq.getRecords("workastdb",query);
+	apiToken = db.get("list").get(0).get("apitoken");
+	headers = {"Authorization":"Bearer " + apiToken};
+	//----------------------------------------------------
+	// API CALL → GET /note/{noteId}
+	//----------------------------------------------------
+	noteResp = invokeurl
+	[
+		url :"https://api.todobot.io/note/" + noteId
+		type :GET
+		headers:headers
+	];
+	info "API Response: " + noteResp;
+	//----------------------------------------------------
+	// EXTRACTIONS (SAFE)
+	//----------------------------------------------------
+	title = noteResp.get("title");
+	listName = "Unknown List";
+	listObj = noteResp.get("list");
+	if(listObj != null && listObj.containsKey("name"))
+	{
+		listName = listObj.get("name");
+	}
+	creator = "Unknown";
+	cb = noteResp.get("createdBy");
+	if(cb != null && cb.containsKey("name"))
+	{
+		creator = cb.get("name");
+	}
+	created = "Not available";
+	createdRaw = noteResp.get("createdAt");
+	if(createdRaw != null && createdRaw != "")
+	{
+		created = createdRaw.toDate().toString("dd-MMM-yyyy hh:mm a");
+	}
+	updated = "Not updated";
+	updatedRaw = noteResp.get("updatedAt");
+	if(updatedRaw != null && updatedRaw != "")
+	{
+		updated = updatedRaw.toDate().toString("dd-MMM-yyyy hh:mm a");
+	}
+	cleanBody = noteResp.get("body").replaceAll("<p>","").replaceAll("</p>","");
+	//----------------------------------------------------
+	// OUTPUT MESSAGE
+	//----------------------------------------------------
+	text = "📘 *Note Details*\n";
+	text = text + "━━━━━━━━━━━━━━━━━━\n";
+	text = text + "📝 **Title:** " + title + "\n";
+	text = text + "📁 **List:** " + listName + "\n";
+	text = text + "🙋 **Created By:** " + creator + "\n";
+	text = text + "📅 **Created:** " + created + "\n";
+	text = text + "✏️ **Updated:** " + updated + "\n";
+	text = text + "━━━━━━━━━━━━━━━━━━\n";
+	text = text + "🧾 **Content:**\n" + cleanBody;
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	result.put("bot",bot);
+	result.put("text",text);
+	return result;
+}
+catch (e)
+{
+	info "❌ ERROR: " + e;
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	return {"bot":bot,"text":"❌ Error fetching note details.\n" + e.toString()};
+}
+// REQUIRED FALLBACK RETURN
+fallback = Map();
+fallback.put("bot",{"name":"Workast","image":"https://cdn.workast.io/avatar.png"});
+fallback.put("text","⚠ Unexpected exit.");
+return fallback;

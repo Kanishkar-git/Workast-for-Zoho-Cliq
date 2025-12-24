@@ -1,0 +1,1758 @@
+
+response = Map();
+// -------------------------------------------------------
+// CONSTANTS
+// -------------------------------------------------------
+query = Map();
+query.put("criteria","userid=" + user.get("id"));
+db_res = zoho.cliq.getRecords("workastwebhookdb",query);
+googleapikey = null;
+if(db_res.get("list") != null && db_res.get("list").size() > 0)
+{
+	googleapikey = db_res.get("list").get(0).get("googleapikey");
+}
+// info "Google API Key: " + googleapikey;
+GEMINI_API_KEY = googleapikey;
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY;
+// -------------------------------------------------------
+// MAIN AI CHECK
+// -------------------------------------------------------
+// Keywords the bot should treat as greetings or small talk
+greetWords = {"hi","hello","hey","yo","sup","hola","how are you","how r u","what's up","whats up","what are you doing","wyd","gm","good morning","good night","gn","weather","how is the weather","hi workast","hello workast","hey workast","yo workast","sup workast","hola workast","how are you workast","how r u workast","what's up workast","whats up workast","what are you doing workast","wyd workast","gm workast","good morning workast","good night workast","gn workast","weather workast","how is the weather workast"};
+// Lowercase incoming text
+msg = message;
+userMessage = message.toLowerCase();
+if(greetWords.contains(userMessage))
+{
+	response = Map();
+	response.put("text","👋 Hey " + user.get("first_name") + "! \n\n" + "I'm here to help you with your Workast tasks and AI actions ✨.\n\n" + "👉 *Click the **Help** icon to explore all available commands!* \n" + "Or simply type */workast help*.\n\n" + "I'm always happy to chat — but it's even cooler when we get work done 😉🔥");
+	bot = Map();
+	bot.put("name","Workast Bot");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("title","Need Help");
+	card.put("thumbnail","https://cdn.workast.io/avatar.png");
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	return response;
+}
+else
+{
+	if(message.containsIgnoreCase("--ai"))
+	{
+		// Clean message once
+		/***********************************************
+	* 4) GET SPACE HEALTH  (--ai)
+	***********************************************/
+		cleanText = message.replaceAll("--ai","").trim();
+		if(message.containsIgnoreCase("get space health"))
+		{
+			try 
+			{
+				//---------------------------------------------------
+				// Extract space name
+				//---------------------------------------------------
+				cleanText = message.replaceAll("--ai","").replaceAll("get space health","").trim();
+				spaceName = cleanText;
+				if(spaceName == "")
+				{
+					response.put("text","🤔 Usage: `get space health <spacename> --ai`");
+					return response;
+				}
+				//---------------------------------------------------
+				// Fetch Workast token
+				//---------------------------------------------------
+				q = {"criteria":"userid=" + user.get("id")};
+				db = zoho.cliq.getRecords("workastdb",q);
+				if(db.get("list").size() == 0)
+				{
+					response.put("text","❌ Please link your Workast account first.");
+					return response;
+				}
+				apitoken = db.get("list").get(0).get("apitoken");
+				workHeaders = {"Authorization":"Bearer " + apitoken,"Accept":"application/json"};
+				//---------------------------------------------------
+				// Get Spaces
+				//---------------------------------------------------
+				spaces = invokeurl
+				[
+					url :"https://api.todobot.io/list"
+					type :GET
+					headers:workHeaders
+				];
+				//---------------------------------------------------
+				// Find spaceId
+				//---------------------------------------------------
+				spaceId = "";
+				for each  sp in spaces
+				{
+					if(sp.get("name") != null && sp.get("name").toLowerCase() == spaceName.toLowerCase())
+					{
+						spaceId = sp.get("id");
+						break;
+					}
+				}
+				if(spaceId == "")
+				{
+					response.put("text","🔍 Space not found: **" + spaceName + "**");
+					return response;
+				}
+				//---------------------------------------------------
+				// Get PENDING tasks
+				//---------------------------------------------------
+				pendingTasks = invokeurl
+				[
+					url :"https://api.todobot.io/list/" + spaceId + "/task?statusIs=pending"
+					type :GET
+					headers:workHeaders
+				];
+				//---------------------------------------------------
+				// Get DONE tasks
+				//---------------------------------------------------
+				doneTasks = invokeurl
+				[
+					url :"https://api.todobot.io/list/" + spaceId + "/task?statusIs=done"
+					type :GET
+					headers:workHeaders
+				];
+				//---------------------------------------------------
+				// Merge Into allTasks[]
+				//---------------------------------------------------
+				allTasks = list();
+				for each  t in pendingTasks
+				{
+					t.put("status","pending");
+					allTasks.add(t);
+				}
+				for each  t in doneTasks
+				{
+					t.put("status","done");
+					allTasks.add(t);
+				}
+				if(allTasks.size() == 0)
+				{
+					response.put("text","🎉 Space **" + spaceName + "** has no tasks yet!");
+					return response;
+				}
+				//---------------------------------------------------
+				// Compute Stats
+				//---------------------------------------------------
+				today = zoho.currentdate;
+				totalTasks = allTasks.size();
+				completedCount = doneTasks.size();
+				pendingCount = pendingTasks.size();
+				overdueCount = 0;
+				noDueDateCount = 0;
+				unassignedCount = 0;
+				taskDetailsList = list();
+				for each  task in allTasks
+				{
+					taskTitle = task.get("text");
+					if(taskTitle == null || taskTitle == "")
+					{
+						taskTitle = "Untitled Task";
+					}
+					taskStatus = task.get("status");
+					//---------------------------------------------------
+					// Due Date Handling
+					//---------------------------------------------------
+					dueDate = task.get("dueDate");
+					dueDateStr = "Not Set";
+					isOverdue = false;
+					if(dueDate != null && dueDate != "")
+					{
+						dueDateStr = dueDate;
+						dObj = dueDate.toDate();
+						if(dObj < today && taskStatus != "done")
+						{
+							overdueCount = overdueCount + 1;
+							isOverdue = true;
+						}
+					}
+					else
+					{
+						noDueDateCount = noDueDateCount + 1;
+					}
+					//---------------------------------------------------
+					// Assignee
+					//---------------------------------------------------
+					assignedTo = task.get("assignedTo");
+					assigneeStr = "Unassigned";
+					if(assignedTo != null && assignedTo.size() > 0)
+					{
+						names = list();
+						for each  a in assignedTo
+						{
+							names.add(a.get("name"));
+						}
+						assigneeStr = names.toString();
+					}
+					else
+					{
+						unassignedCount = unassignedCount + 1;
+					}
+					//---------------------------------------------------
+					// Build Detail Line
+					//---------------------------------------------------
+					line = "- *" + taskTitle + "*\n";
+					line = line + "  Status: " + taskStatus;
+					if(isOverdue)
+					{
+						line = line + " ⚠️ OVERDUE";
+					}
+					line = line + "\n  Due: " + dueDateStr;
+					line = line + "\n  Assigned: " + assigneeStr + "\n";
+					taskDetailsList.add(line);
+				}
+				//---------------------------------------------------
+				// Gemini Prompt (unchanged)
+				//---------------------------------------------------
+				prompt = "You are a proffesiobal yet insightful project management AI assistant. Analyze this Workast space and provide a comprehensive health report in 200 words\n\n";
+				prompt = prompt + "🏢 *Space Name:* " + spaceName + "\n\n";
+				prompt = prompt + "📊 *Summary Statistics:*\n";
+				prompt = prompt + "- Total Tasks: " + totalTasks + "\n";
+				prompt = prompt + "- Completed: " + completedCount + "\n";
+				prompt = prompt + "- Pending: " + pendingCount + "\n";
+				prompt = prompt + "- Overdue: " + overdueCount + "\n";
+				prompt = prompt + "- Unassigned: " + unassignedCount + "\n";
+				prompt = prompt + "- No Due Date: " + noDueDateCount + "\n\n";
+				prompt = prompt + "📝 *Task Details (Top 15):*\n";
+				counter = 0;
+				for each  detail in taskDetailsList
+				{
+					if(counter >= 15)
+					{
+						break;
+					}
+					prompt = prompt + detail + "\n";
+					counter = counter + 1;
+				}
+				//---------------------------------------------------
+				// Gemini Payload
+				//---------------------------------------------------
+				part = {"text":prompt};
+				partsList = list();
+				partsList.add(part);
+				contentItem = {"parts":partsList};
+				contentsList = list();
+				contentsList.add(contentItem);
+				payload = {"contents":contentsList};
+				jsonPayload = payload.toString();
+				//---------------------------------------------------
+				// Call Gemini
+				//---------------------------------------------------
+				gRes = invokeurl
+				[
+					url :GEMINI_URL
+					type :POST
+					parameters:jsonPayload
+					headers:{"Content-Type":"application/json"}
+				];
+				if(!gRes.contains("candidates"))
+				{
+					response.put("text","❌ AI returned no response");
+					return response;
+				}
+				aiText = gRes.get("candidates").get(0).get("content").get("parts").get(0).get("text");
+				info aiText;
+				// 			response.put("text", aiText);
+				// 			return response;
+				aiText = gRes.get("candidates").get(0).get("content").get("parts").get(0).get("text");
+				//---------------------------------------------------
+				// Build Final UI Card
+				//---------------------------------------------------
+				response.put("text","🎊 *AI Health Analysis Complete!**\nSpace: *" + spaceName + "**");
+				bot = {"name":"Workast AI","image":"https://cdn.workast.io/avatar.png"};
+				response.put("bot",bot);
+				card = {"title":"Space Health Report: " + spaceName,"theme":"modern-inline"};
+				response.put("card",card);
+				slides = List();
+				slides.add({"type":"text","data":aiText});
+				// Stats table
+				headers = List();
+				headers.add("Metric");
+				headers.add("Count");
+				rows = List();
+				rows.add({"Metric":"Completed","Count":completedCount});
+				rows.add({"Metric":"Pending","Count":pendingCount});
+				rows.add({"Metric":"Overdue","Count":overdueCount});
+				rows.add({"Metric":"Unassigned","Count":unassignedCount});
+				rows.add({"Metric":"No Due Date","Count":noDueDateCount});
+				slides.add({"type":"table","title":"📊 Quick Stats","data":{"headers":headers,"rows":rows}});
+				response.put("slides",slides);
+				return response;
+			}
+			catch (e)
+			{
+				banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+				return banner;
+			}
+		}
+		if(message.containsIgnoreCase("analyse today tasks"))
+		{
+			try 
+			{
+				//---------------------------------------------------
+				// Fetch Workast token
+				//---------------------------------------------------
+				q = {"criteria":"userid=" + user.get("id")};
+				db = zoho.cliq.getRecords("workastdb",q);
+				if(db.get("list").size() == 0)
+				{
+					response.put("text","❌ Please link your Workast account first.");
+					return response;
+				}
+				apitoken = db.get("list").get(0).get("apitoken");
+				workastUserId = db.get("list").get(0).get("workastid");
+				workHeaders = {"Authorization":"Bearer " + apitoken,"Accept":"application/json"};
+				//---------------------------------------------------
+				// Fetch user's pending tasks
+				//---------------------------------------------------
+				params = Map();
+				params.put("assignedTo","true");
+				params.put("statusIs","pending");
+				// 		params.put("userId", workastUserId);
+				tasks = invokeurl
+				[
+					url :"https://api.todobot.io/user/" + workastUserId + "/task"
+					type :GET
+					parameters:params
+					headers:workHeaders
+				];
+				// 			info tasks;
+				if(tasks.size() == 0)
+				{
+					response.put("text","🎉 No pending tasks! You're all caught up! 🙌");
+					return response;
+				}
+				//---------------------------------------------------
+				// Filter today's + overdue tasks
+				//---------------------------------------------------
+				today = zoho.currentdate;
+				todayTasks = List();
+				overdueTasks = List();
+				try 
+				{
+					for each  task in tasks
+					{
+						dueDate = task.get("dueDate");
+						if(dueDate != null && dueDate != "")
+						{
+							if(dueDate.toDate() == today)
+							{
+								todayTasks.add(task);
+							}
+							else if(dueDate.toDate() < today)
+							{
+								overdueTasks.add(task);
+							}
+						}
+					}
+				}
+				catch (e)
+				{
+					info "error at loop" + dueDate + today;
+				}
+				// 			for each  task in tasks
+				relevantTasks = List();
+				relevantTasks.addAll(overdueTasks);
+				relevantTasks.addAll(todayTasks);
+				if(relevantTasks.size() == 0)
+				{
+					response.put("text","🌅 Nothing urgent today! You have " + tasks.size() + " pending tasks, but none are due today or overdue. 💪");
+					return response;
+				}
+				//---------------------------------------------------
+				// Build task details for Gemini
+				//---------------------------------------------------
+				prompt = "You are a productivity AI assistant with a proffesional, encouraging personality. Analyze tasks due today or overdue and provide smart recommendations.\n\n";
+				prompt = prompt + "📅 *Today's Date:* " + today + "\n\n";
+				prompt = prompt + "🚨 *Overdue Tasks:* " + overdueTasks.size() + "\n";
+				prompt = prompt + "📌 *Due Today:* " + todayTasks.size() + "\n";
+				prompt = prompt + "📋 *Total to Analyze:* " + relevantTasks.size() + "\n\n";
+				prompt = prompt + "📝 *Task Details:*\n\n";
+				counter = 0;
+				for each  task in relevantTasks
+				{
+					counter = counter + 1;
+					taskTitle = task.get("text");
+					if(taskTitle == null || taskTitle == "")
+					{
+						taskTitle = "Untitled Task";
+					}
+					prompt = prompt + counter + ". *" + taskTitle + "*\n";
+					dueDate = task.get("dueDate");
+					if(dueDate < today)
+					{
+						prompt = prompt + "   - ⚠️ OVERDUE (Due: " + dueDate + ")\n";
+					}
+					else
+					{
+						prompt = prompt + "   - Due: Today (" + dueDate + ")\n";
+					}
+					// 			if(priority != null && priority != "")
+					// 			{
+					// 				prompt = prompt + "   - Priority: " + priority + "\n";
+					// 			}
+					// 			description = task.get("description");
+					// 			if(description != null && description != "")
+					// 			{
+					// 				if(description.length() > 100)
+					// 				{
+					// 					description = description.subString(0,97) + "...";
+					// 				}
+					// 				prompt = prompt + "   - Description: " + description + "\n";
+					// 			}
+					listInfo = task.get("list");
+					if(listInfo != null && listInfo.containsKey("name"))
+					{
+						prompt = prompt + "   - Space: " + listInfo.get("name") + "\n";
+					}
+					prompt = prompt + "\n";
+				}
+				prompt = prompt + "\n🎯 *Your Task:*\n";
+				prompt = prompt + "Provide:\n";
+				prompt = prompt + "1. *Priority Ranking* - Which tasks first and why (consider overdue, priority, complexity)\n";
+				prompt = prompt + "2. *Time Estimates* - Rough time for each (30min/1hr/2hrs/4hrs+)\n";
+				prompt = prompt + "3. *Execution Strategy* - Batching, quick wins, deep focus needs, dependencies\n";
+				prompt = prompt + "4. *Motivational Boost* - Encouraging words!\n";
+				prompt = prompt + "5. *Risk Warning* - What happens if overdue tasks slip further\n\n";
+				prompt = prompt + "Write in a friendly, motivating tone with emojis. Be actionable and encouraging!";
+				//---------------------------------------------------
+				// Gemini API Configuration
+				//---------------------------------------------------
+				//---------------------------------------------------
+				// Build Gemini payload
+				//---------------------------------------------------
+				part = Map();
+				part.put("text",prompt);
+				partsList = List();
+				partsList.add(part);
+				contentItem = Map();
+				contentItem.put("parts",partsList);
+				contentsList = List();
+				contentsList.add(contentItem);
+				payload = Map();
+				payload.put("contents",contentsList);
+				jsonPayload = payload.toString();
+				//---------------------------------------------------
+				// Call Gemini API
+				//---------------------------------------------------
+				gRes = invokeurl
+				[
+					url :GEMINI_URL
+					type :POST
+					parameters:jsonPayload
+					headers:{"Content-Type":"application/json"}
+				];
+				//---------------------------------------------------
+				// Validate response
+				//---------------------------------------------------
+				if(!gRes.contains("candidates"))
+				{
+					response.put("text","❌ AI took a coffee break! ☕ Try again!");
+					return response;
+				}
+				aiText = gRes.get("candidates").get(0).get("content").get("parts").get(0).get("text");
+				// 			info aiText;
+				//---------------------------------------------------
+				// Build final response card
+				//---------------------------------------------------
+				response.put("text","🎊 *AI Task Analysis Complete!*\n\n📅 Analyzing " + relevantTasks.size() + " tasks for today");
+				bot = Map();
+				bot.put("name","Workast AI");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				card = Map();
+				card.put("title","Today's Task Analysis - " + today);
+				card.put("theme","modern-inline");
+				response.put("card",card);
+				// Create slides
+				slidesList = List();
+				// Slide 1: AI Analysis
+				slide1 = Map();
+				slide1.put("type","text");
+				slide1.put("data",aiText);
+				slidesList.add(slide1);
+				// Slide 2: Task List Table
+				slide2 = Map();
+				slide2.put("type","table");
+				slide2.put("title","📋 Your Tasks");
+				tableData = Map();
+				tableHeaders = List();
+				tableHeaders.add("Task");
+				tableHeaders.add("Due");
+				tableHeaders.add("Priority");
+				tableHeaders.add("Status");
+				tableData.put("headers",tableHeaders);
+				tableRows = List();
+				for each  task in relevantTasks
+				{
+					row = Map();
+					taskTitle = task.get("text");
+					if(taskTitle == null || taskTitle == "")
+					{
+						taskTitle = "Untitled";
+					}
+					if(taskTitle.length() > 40)
+					{
+						taskTitle = taskTitle.subString(0,37) + "...";
+					}
+					row.put("Task",taskTitle);
+					dueDate = task.get("dueDate");
+					if(dueDate < today)
+					{
+						row.put("Due","🚨 " + dueDate);
+						row.put("Status","OVERDUE");
+					}
+					else
+					{
+						row.put("Due","📅 Today");
+						row.put("Status","Due Today");
+					}
+					priority = task.get("priority");
+					if(priority != null && priority != "")
+					{
+						if(priority.toLowerCase() == "high")
+						{
+							row.put("Priority","🔴 High");
+						}
+						else if(priority.toLowerCase() == "medium")
+						{
+							row.put("Priority","🟡 Medium");
+						}
+						else
+						{
+							row.put("Priority","🟢 Normal");
+						}
+					}
+					else
+					{
+						row.put("Priority","🟢 Normal");
+					}
+					tableRows.add(row);
+				}
+				tableData.put("rows",tableRows);
+				slide2.put("data",tableData);
+				slidesList.add(slide2);
+				response.put("slides",slidesList);
+				return response;
+			}
+			catch (e)
+			{
+				banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+				return banner;
+			}
+		}
+		// ---------------------------------------------------
+		// 1) DELETE TASK
+		// ---------------------------------------------------
+		if(message.containsIgnoreCase("delete task"))
+		{
+			try 
+			{
+				// -----------------------
+				// 1) Ask Gemini to extract which task to delete
+				// -----------------------
+				prompt = "Extract task deletion details and return ONLY JSON:\n" + "{ \"taskName\":\"\" }\n\n" + "Rules:\n" + "- Extract the task name/title to delete\n" + "- Do NOT include any additional text or markdown\n\n" + "Message:\n" + cleanText;
+				// Build Gemini payload
+				part = Map();
+				part.put("text",prompt);
+				partsList = list();
+				partsList.add(part);
+				contentItem = Map();
+				contentItem.put("parts",partsList);
+				contentsList = list();
+				contentsList.add(contentItem);
+				payload = Map();
+				payload.put("contents",contentsList);
+				jsonPayload = payload.toString();
+				// Call Gemini
+				gRes = invokeurl
+				[
+					url :GEMINI_URL
+					type :POST
+					parameters:jsonPayload
+					headers:{"Content-Type":"application/json"}
+				];
+				if(!gRes.containsKey("candidates"))
+				{
+					response.put("text","❌ AI returned no response. Try again.");
+					return response;
+				}
+				outputText = gRes.get("candidates").get(0).get("content").get("parts").get(0).get("text");
+				cleaned = outputText.replaceAll("```json","").replaceAll("```","").trim();
+				// Parse the JSON returned by Gemini
+				try 
+				{
+					aiParsed = cleaned.toMap();
+				}
+				catch (pe)
+				{
+					response.put("text","❌ Could not parse AI response. AI returned:\n" + cleaned);
+					return response;
+				}
+				taskName = aiParsed.get("taskName");
+				if(taskName == null || taskName.trim() == "")
+				{
+					response.put("text","❌ I couldn't detect which task to delete.\n\n💡 Try: `delete task fix login bug --ai`");
+					return response;
+				}
+				// -----------------------
+				// 2) Fetch Workast token + user id
+				// -----------------------
+				q = {"criteria":"userid=" + user.get("id")};
+				db = zoho.cliq.getRecords("workastdb",q);
+				if(db.get("list").size() == 0)
+				{
+					response.put("text","❌ Please link your Workast account first.");
+					return response;
+				}
+				apitoken = db.get("list").get(0).get("apitoken");
+				workastUserId = db.get("list").get(0).get("workastid");
+				workHeaders = {"Authorization":"Bearer " + apitoken,"Accept":"application/json"};
+				// -----------------------
+				// 3) Fetch tasks for the user
+				// -----------------------
+				tasks = invokeurl
+				[
+					url :"https://api.todobot.io/user/" + workastUserId + "/task"
+					type :GET
+					headers:workHeaders
+				];
+				if(tasks == null || tasks.size() == 0)
+				{
+					response.put("text","❌ No tasks found for your account.");
+					return response;
+				}
+				// -----------------------
+				// 4) Fuzzy match taskName -> find candidates
+				// -----------------------
+				target = taskName.toLowerCase();
+				matches = list();
+				for each  t in tasks
+				{
+					title = "";
+					if(t.containsKey("text") && t.get("text") != null)
+					{
+						title = t.get("text");
+					}
+					else
+					{
+						continue;
+					}
+					lower = title.toLowerCase();
+					if(lower == target || lower.contains(target) || target.contains(lower))
+					{
+						summary = Map();
+						if(t.containsKey("id"))
+						{
+							summary.put("id",t.get("id"));
+						}
+						else if(t.containsKey("_id"))
+						{
+							summary.put("id",t.get("_id"));
+						}
+						else
+						{
+							summary.put("id",t.get("taskId"));
+						}
+						summary.put("text",title);
+						if(t.containsKey("dueDate"))
+						{
+							summary.put("dueDate",t.get("dueDate"));
+						}
+						else
+						{
+							summary.put("dueDate","");
+						}
+						if(t.containsKey("status"))
+						{
+							summary.put("status",t.get("status"));
+						}
+						else
+						{
+							summary.put("status","");
+						}
+						summary.put("raw",t);
+						matches.add(summary);
+					}
+				}
+				// If no direct matches, try looser word-based matching
+				if(matches.size() == 0)
+				{
+					for each  t in tasks
+					{
+						title = "";
+						if(t.containsKey("text") && t.get("text") != null)
+						{
+							title = t.get("text");
+						}
+						else
+						{
+							continue;
+						}
+						lower = title.toLowerCase();
+						parts = target.toList(" ");
+						found = false;
+						for each  p in parts
+						{
+							if(p != null && p.trim() != "" && lower.contains(p.trim()))
+							{
+								found = true;
+								break;
+							}
+						}
+						if(found)
+						{
+							summary = Map();
+							if(t.containsKey("id"))
+							{
+								summary.put("id",t.get("id"));
+							}
+							else if(t.containsKey("_id"))
+							{
+								summary.put("id",t.get("_id"));
+							}
+							else
+							{
+								summary.put("id",t.get("taskId"));
+							}
+							summary.put("text",title);
+							if(t.containsKey("dueDate"))
+							{
+								summary.put("dueDate",t.get("dueDate"));
+							}
+							else
+							{
+								summary.put("dueDate","");
+							}
+							if(t.containsKey("status"))
+							{
+								summary.put("status",t.get("status"));
+							}
+							else
+							{
+								summary.put("status","");
+							}
+							summary.put("raw",t);
+							matches.add(summary);
+						}
+					}
+				}
+				// -----------------------
+				// 5) Handle match counts
+				// -----------------------
+				if(matches.size() == 0)
+				{
+					msg = "❌ I couldn't find a task matching: **" + taskName + "**\n\n";
+					msg = msg + "Here are a few recent tasks:\n\n";
+					idx = 1;
+					counter = 0;
+					for each  t in tasks
+					{
+						if(counter >= 5)
+						{
+							break;
+						}
+						title = "Untitled";
+						if(t.containsKey("text"))
+						{
+							title = t.get("text");
+						}
+						msg = msg + idx + ". " + title + "\n";
+						idx = idx + 1;
+						counter = counter + 1;
+					}
+					msg = msg + "\n💡 Example: `delete task old meeting notes --ai`";
+					response.put("text",msg);
+					return response;
+				}
+				else if(matches.size() > 1)
+				{
+					msg = "⚠️ I found **" + matches.size() + " tasks** matching \"" + taskName + "\":\n\n";
+					i = 1;
+					for each  m in matches
+					{
+						msg = msg + i + ". **" + m.get("text") + "**";
+						if(m.get("dueDate") != null && m.get("dueDate") != "")
+						{
+							msg = msg + " (Due: " + m.get("dueDate") + ")";
+						}
+						if(m.get("status") != null && m.get("status") != "")
+						{
+							msg = msg + " [" + m.get("status") + "]";
+						}
+						msg = msg + "\n";
+						i = i + 1;
+					}
+					msg = msg + "\n⚠️ **Please be more specific** to avoid deleting the wrong task.\n";
+					msg = msg + "💡 Use the full name like:\n`delete task " + matches.get(0).get("text") + " --ai`";
+					response.put("text",msg);
+					return response;
+				}
+				// Single match → proceed with deletion
+				matched = matches.get(0);
+				info "match:" + matched;
+				rawTask = matched.get("raw");
+				taskId = matched.get("id");
+				if(rawTask.containsKey("id"))
+				{
+					taskId = rawTask.get("id");
+				}
+				else if(rawTask.containsKey("_id"))
+				{
+					taskId = rawTask.get("_id");
+				}
+				else if(matched.containsKey("id"))
+				{
+					taskId = matched.get("id");
+				}
+				if(taskId == null || taskId.trim() == "")
+				{
+					response.put("text","❌ Could not determine the task ID for the matched task.");
+					return response;
+				}
+				// -----------------------
+				// 6) Delete the task
+				// -----------------------
+				info "delete task id:" + taskId;
+				delResp = invokeurl
+				[
+					url :"https://api.todobot.io/task/" + taskId
+					type :DELETE
+					headers:{"Authorization":"Bearer " + apitoken}
+				];
+				// -----------------------
+				// 7) Build success message with UI CARD
+				// -----------------------
+				// Motivational quotes for deletion
+				deleteQuotes = list();
+				deleteQuotes.add("Task cleared! 🎯 Your workspace just got cleaner!");
+				deleteQuotes.add("One less thing to worry about! 💪 Well done!");
+				deleteQuotes.add("Task eliminated! 🗑️ Keep that momentum going!");
+				deleteQuotes.add("Successfully removed! ✨ Your focus is sharper now!");
+				deleteQuotes.add("Deleted with precision! 🎪 You're managing like a pro!");
+				randomIdx = randomNumber(0,deleteQuotes.size());
+				deleteMotivation = deleteQuotes.get(randomIdx);
+				// Format due date
+				formattedDue = "Not set";
+				if(matched.get("dueDate") != null && matched.get("dueDate") != "")
+				{
+					formattedDue = matched.get("dueDate");
+				}
+				// Format status
+				formattedStatus = "Unknown";
+				if(matched.get("status") != null && matched.get("status") != "")
+				{
+					formattedStatus = matched.get("status");
+				}
+				response = Map();
+				// Bot info
+				bot = Map();
+				bot.put("name","Workast AI");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				// Card
+				card = Map();
+				card.put("title","🗑️ Task Deleted:\n" + matched.get("text"));
+				card.put("theme","modern-inline");
+				response.put("card",card);
+				// Text message
+				response.put("text",deleteMotivation + "\n\n" + "📌 *Task:* " + matched.get("text") + "\n" + "🆔 *Task ID:* `" + taskId + "`\n" + "📅 *Was Due:* " + formattedDue + "\n" + "✓ *Was:* " + formattedStatus);
+				return response;
+			}
+			catch (e)
+			{
+				banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+				return banner;
+			}
+		}
+		// ---------------------------------------------------
+		// 2) UPDATE TASK
+		// ---------------------------------------------------
+		if(message.containsIgnoreCase("update task"))
+		{
+			try 
+			{
+				// -----------------------
+				// 1) Ask Gemini to extract which task + what to change
+				// -----------------------
+				prompt = "Extract task update details and return ONLY JSON with these keys:\n" + "{ \"taskName\":\"\", \"newText\":\"\", \"newDescription\":\"\", \"newDueDate\":\"YYYY-MM-DD\", \"newStatus\":\"\" }\n\n" + "Rules:\n" + "- Only fill fields that should be updated\n" + "- newStatus can be: 'done', 'pending', or empty\n" + "- Do NOT include any additional text or markdown\n\n" + "Message:\n" + cleanText;
+				// Build Gemini payload
+				part = Map();
+				part.put("text",prompt);
+				partsList = list();
+				partsList.add(part);
+				contentItem = Map();
+				contentItem.put("parts",partsList);
+				contentsList = list();
+				contentsList.add(contentItem);
+				payload = Map();
+				payload.put("contents",contentsList);
+				jsonPayload = payload.toString();
+				// Call Gemini
+				gRes = invokeurl
+				[
+					url :GEMINI_URL
+					type :POST
+					parameters:jsonPayload
+					headers:{"Content-Type":"application/json"}
+				];
+				if(!gRes.containsKey("candidates"))
+				{
+					response.put("text","❌ AI returned no response. Try again.");
+					return response;
+				}
+				outputText = gRes.get("candidates").get(0).get("content").get("parts").get(0).get("text");
+				cleaned = outputText.replaceAll("```json","").replaceAll("```","").trim();
+				// Parse the JSON returned by Gemini
+				try 
+				{
+					aiParsed = cleaned.toMap();
+				}
+				catch (pe)
+				{
+					response.put("text","❌ Could not parse AI response. AI returned:\n" + cleaned);
+					return response;
+				}
+				taskName = aiParsed.get("taskName");
+				newText = aiParsed.get("newText");
+				newDescription = aiParsed.get("newDescription");
+				newDueDate = aiParsed.get("newDueDate");
+				newStatus = aiParsed.get("newStatus");
+				if(taskName == null || taskName.trim() == "")
+				{
+					response.put("text","❌ I couldn't detect which task to update.\n\n💡 Try: `update task <task name> change due date to tomorrow --ai`");
+					return response;
+				}
+				// -----------------------
+				// 2) Fetch Workast token + user id
+				// -----------------------
+				q = {"criteria":"userid=" + user.get("id")};
+				db = zoho.cliq.getRecords("workastdb",q);
+				if(db.get("list").size() == 0)
+				{
+					response.put("text","❌ Please link your Workast account first.");
+					return response;
+				}
+				apitoken = db.get("list").get(0).get("apitoken");
+				workastUserId = db.get("list").get(0).get("workastid");
+				workHeaders = {"Authorization":"Bearer " + apitoken,"Accept":"application/json"};
+				// -----------------------
+				// 3) Fetch tasks for the user
+				// -----------------------
+				tasks = invokeurl
+				[
+					url :"https://api.todobot.io/user/" + workastUserId + "/task"
+					type :GET
+					headers:workHeaders
+				];
+				if(tasks == null || tasks.size() == 0)
+				{
+					response.put("text","❌ No tasks found for your account.");
+					return response;
+				}
+				// -----------------------
+				// 4) Fuzzy match taskName -> find candidates
+				// -----------------------
+				target = taskName.toLowerCase();
+				matches = list();
+				for each  t in tasks
+				{
+					title = "";
+					if(t.containsKey("text") && t.get("text") != null)
+					{
+						title = t.get("text");
+					}
+					else
+					{
+						continue;
+					}
+					lower = title.toLowerCase();
+					if(lower == target || lower.contains(target) || target.contains(lower))
+					{
+						summary = Map();
+						if(t.containsKey("id"))
+						{
+							summary.put("id",t.get("id"));
+						}
+						else if(t.containsKey("_id"))
+						{
+							summary.put("id",t.get("_id"));
+						}
+						else
+						{
+							summary.put("id",t.get("taskId"));
+						}
+						summary.put("text",title);
+						if(t.containsKey("dueDate"))
+						{
+							summary.put("dueDate",t.get("dueDate"));
+						}
+						else
+						{
+							summary.put("dueDate","");
+						}
+						if(t.containsKey("status"))
+						{
+							summary.put("status",t.get("status"));
+						}
+						else
+						{
+							summary.put("status","");
+						}
+						if(t.containsKey("link"))
+						{
+							summary.put("link",t.get("link"));
+						}
+						else
+						{
+							summary.put("link","https://app.workast.io");
+						}
+						summary.put("raw",t);
+						matches.add(summary);
+					}
+				}
+				// If no direct matches, try looser word-based matching
+				if(matches.size() == 0)
+				{
+					for each  t in tasks
+					{
+						title = "";
+						if(t.containsKey("text") && t.get("text") != null)
+						{
+							title = t.get("text");
+						}
+						else
+						{
+							continue;
+						}
+						lower = title.toLowerCase();
+						parts = target.toList(" ");
+						found = false;
+						for each  p in parts
+						{
+							if(p != null && p.trim() != "" && lower.contains(p.trim()))
+							{
+								found = true;
+								break;
+							}
+						}
+						if(found)
+						{
+							summary = Map();
+							if(t.containsKey("id"))
+							{
+								summary.put("id",t.get("id"));
+							}
+							else if(t.containsKey("_id"))
+							{
+								summary.put("id",t.get("_id"));
+							}
+							else
+							{
+								summary.put("id",t.get("taskId"));
+							}
+							summary.put("text",title);
+							if(t.containsKey("dueDate"))
+							{
+								summary.put("dueDate",t.get("dueDate"));
+							}
+							else
+							{
+								summary.put("dueDate","");
+							}
+							if(t.containsKey("status"))
+							{
+								summary.put("status",t.get("status"));
+							}
+							else
+							{
+								summary.put("status","");
+							}
+							if(t.containsKey("link"))
+							{
+								summary.put("link",t.get("link"));
+							}
+							else
+							{
+								summary.put("link","https://app.workast.io");
+							}
+							summary.put("raw",t);
+							matches.add(summary);
+						}
+					}
+				}
+				// -----------------------
+				// 5) Handle match counts
+				// -----------------------
+				if(matches.size() == 0)
+				{
+					msg = "❌ I couldn't find a task matching: **" + taskName + "**\n\n";
+					msg = msg + "Here are a few recent tasks:\n\n";
+					idx = 1;
+					counter = 0;
+					for each  t in tasks
+					{
+						if(counter >= 5)
+						{
+							break;
+						}
+						title = "Untitled";
+						if(t.containsKey("text"))
+						{
+							title = t.get("text");
+						}
+						msg = msg + idx + ". " + title + "\n";
+						idx = idx + 1;
+						counter = counter + 1;
+					}
+					msg = msg + "\n💡 Example: `update task Prepare presentation change due date to tomorrow --ai`";
+					response.put("text",msg);
+					return response;
+				}
+				else if(matches.size() > 1)
+				{
+					msg = "⚠️ I found **" + matches.size() + " tasks** matching \"" + taskName + "\":\n\n";
+					i = 1;
+					for each  m in matches
+					{
+						msg = msg + i + ". **" + m.get("text") + "**";
+						if(m.get("dueDate") != null && m.get("dueDate") != "")
+						{
+							msg = msg + " (Due: " + m.get("dueDate") + ")";
+						}
+						msg = msg + "\n";
+						i = i + 1;
+					}
+					msg = msg + "\n💡 Use a more specific name like:\n`update task " + matches.get(0).get("text") + " <changes> --ai`";
+					response.put("text",msg);
+					return response;
+				}
+				// Single match → proceed
+				matched = matches.get(0);
+				rawTask = matched.get("raw");
+				taskId = "";
+				if(rawTask.containsKey("id"))
+				{
+					taskId = rawTask.get("id");
+				}
+				else if(rawTask.containsKey("_id"))
+				{
+					taskId = rawTask.get("_id");
+				}
+				else if(matched.containsKey("id"))
+				{
+					taskId = matched.get("id");
+				}
+				if(taskId == null || taskId.trim() == "")
+				{
+					response.put("text","❌ Could not determine the task ID for the matched task.");
+					return response;
+				}
+				taskLink = matched.get("link");
+				// -----------------------
+				// 6) Handle STATUS TOGGLE with correct endpoints
+				// -----------------------
+				statusToggled = false;
+				newStatusText = "";
+				if(newStatus != null && newStatus.trim() != "")
+				{
+					targetStatus = newStatus.toLowerCase();
+					listId = "";
+					if(rawTask.containsKey("list"))
+					{
+						listId = rawTask.get("list");
+					}
+					if(listId != null && listId != "")
+					{
+						if(targetStatus == "done" || targetStatus == "complete" || targetStatus == "completed")
+						{
+							// Mark as done
+							toggleResp = invokeurl
+							[
+								url :"https://api.todobot.io/task/" + taskId + "/done"
+								type :POST
+								parameters:{"list":listId}
+								headers:{"Authorization":"Bearer " + apitoken,"Content-Type":"application/json"}
+							];
+							statusToggled = true;
+							newStatusText = "done";
+						}
+						else if(targetStatus == "undone" || targetStatus == "pending" || targetStatus == "incomplete")
+						{
+							// Mark as undone
+							toggleResp = invokeurl
+							[
+								url :"https://api.todobot.io/task/" + taskId + "/undone"
+								type :POST
+								parameters:{"list":listId}
+								headers:{"Authorization":"Bearer " + apitoken,"Content-Type":"application/json"}
+							];
+							statusToggled = true;
+							newStatusText = "pending";
+						}
+					}
+				}
+				// -----------------------
+				// 7) Build PATCH body (only text, description, dueDate)
+				// -----------------------
+				patchBody = Map();
+				if(newText != null && newText.trim() != "")
+				{
+					patchBody.put("text",newText);
+				}
+				if(newDescription != null && newDescription.trim() != "")
+				{
+					patchBody.put("description",newDescription);
+				}
+				if(newDueDate != null && newDueDate.trim() != "")
+				{
+					patchBody.put("dueDate",newDueDate + "T00:00:00.000Z");
+				}
+				// -----------------------
+				// 8) Send PATCH if there are field updates
+				// -----------------------
+				if(!patchBody.isEmpty())
+				{
+					updateResp = invokeurl
+					[
+						url :"https://api.todobot.io/task/" + taskId
+						type :PATCH
+						parameters:patchBody
+						headers:{"Authorization":"Bearer " + apitoken,"Content-Type":"application/json"}
+					];
+				}
+				// -----------------------
+				// 9) Build success message with UI CARD
+				// -----------------------
+				if(patchBody.isEmpty() && !statusToggled)
+				{
+					response.put("text","❌ No valid updates detected.\n\n✅ **Supported updates:**\n• Task title\n• Description\n• Due date\n• Status (done/pending)\n\n💡 Example: `update task login bug change due date to next friday --ai`");
+					return response;
+				}
+				// Motivational quotes for updates
+				updateQuotes = list();
+				updateQuotes.add("Task updated perfectly! 🎯 You're on top of things!");
+				updateQuotes.add("Changes saved! ⚡ Your organization skills are impressive!");
+				updateQuotes.add("Updated successfully! 🌟 Keep that workflow smooth!");
+				updateQuotes.add("Modifications applied! 💪 You're managing like a boss!");
+				updateQuotes.add("Task refined! ✨ Efficiency at its best!");
+				randomIdx = randomNumber(0,updateQuotes.size());
+				updateMotivation = updateQuotes.get(randomIdx);
+				// Build update summary
+				updateSummary = "";
+				if(patchBody.containsKey("text"))
+				{
+					updateSummary = updateSummary + "📝 *Title:* " + patchBody.get("text") + "\n";
+				}
+				if(patchBody.containsKey("description"))
+				{
+					updateSummary = updateSummary + "📄 *Description:* Updated\n";
+				}
+				if(patchBody.containsKey("dueDate"))
+				{
+					updateSummary = updateSummary + "📅 *Due Date:* " + newDueDate + "\n";
+				}
+				if(statusToggled)
+				{
+					updateSummary = updateSummary + "✓ *Status:* " + newStatusText + "\n";
+				}
+				response = Map();
+				// Bot info
+				bot = Map();
+				bot.put("name","Workast AI");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				// Card
+				card = Map();
+				card.put("title","✅ Task Updated!\n");
+				card.put("theme","modern-inline");
+				response.put("card",card);
+				// Buttons
+				buttonsList = list();
+				buttonsList0 = Map();
+				buttonsList0.put("label","View Task");
+				action0 = Map();
+				action0.put("type","open.url");
+				data0 = Map();
+				data0.put("web",taskLink);
+				action0.put("data",data0);
+				buttonsList0.put("action",action0);
+				buttonsList.add(buttonsList0);
+				buttonsList1 = Map();
+				buttonsList1.put("label","More Details");
+				buttonsList1.put("type","+");
+				action1 = Map();
+				action1.put("type","invoke.function");
+				data1 = Map();
+				data1.put("name","viewtaskdetails");
+				action1.put("data",data1);
+				buttonsList1.put("action",action1);
+				buttonsList1.put("key","task_details|" + taskId);
+				buttonsList.add(buttonsList1);
+				response.put("buttons",buttonsList);
+				// Text message
+				response.put("text",updateMotivation + "\n\n" + "📌 *Task:* " + matched.get("text") + "\n" + "*Changes:*\n" + updateSummary);
+				return response;
+			}
+			catch (e)
+			{
+				banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+				return banner;
+			}
+		}
+		if(message.containsIgnoreCase("create task"))
+		{
+			try 
+			{
+				//---------------------------------------------------
+				// Build AI prompt INCLUDING ASSIGNEE EMAIL AS ARRAY
+				//---------------------------------------------------
+				prompt = "Extract task details and return ONLY JSON with keys:\n" + "{ \"taskName\":\"\", \"space\":\"\", \"dueDate\":\"YYYY-MM-DD\", \"assigneeEmails\":[] }\n\n" + "IMPORTANT:\n" + "- assigneeEmails must be an array of email addresses\n" + "- If no assignee mentioned, return empty array []\n" + "- Examples: [\"user@example.com\"] or [\"user1@example.com\",\"user2@example.com\"]\n\n" + "Message:\n" + cleanText;
+				//---------------------------------------------------
+				// Build payload
+				//---------------------------------------------------
+				part = Map();
+				part.put("text",prompt);
+				partsList = List();
+				partsList.add(part);
+				contentItem = Map();
+				contentItem.put("parts",partsList);
+				contentsList = List();
+				contentsList.add(contentItem);
+				payload = Map();
+				payload.put("contents",contentsList);
+				jsonPayload = payload.toString();
+				//---------------------------------------------------
+				// Gemini API call
+				//---------------------------------------------------
+				gRes = invokeurl
+				[
+					url :GEMINI_URL
+					type :POST
+					parameters:jsonPayload
+					headers:{"Content-Type":"application/json"}
+				];
+				//---------------------------------------------------
+				// Validate → candidates exist
+				//---------------------------------------------------
+				if(!gRes.contains("candidates"))
+				{
+					response.put("text","❌ AI returned no candidates.\nDEBUG:\n" + gRes.toString());
+					return response;
+				}
+				outputText = gRes.get("candidates").get(0).get("content").get("parts").get(0).get("text");
+				//---------------------------------------------------
+				// Clean markdown
+				//---------------------------------------------------
+				cleaned = outputText.replaceAll("```json","").replaceAll("```","").trim();
+				//---------------------------------------------------
+				// Parse JSON
+				//---------------------------------------------------
+				aiParsed = cleaned.toMap();
+				info aiParsed;
+				taskName = aiParsed.get("taskName");
+				spaceName = aiParsed.get("space");
+				dueDate = aiParsed.get("dueDate");
+				assigneeEmails = aiParsed.get("assigneeEmails");
+				if(taskName == "" || spaceName == "")
+				{
+					response.put("text","❌ Missing fields.\nAI Output:\n" + cleaned);
+					return response;
+				}
+				//---------------------------------------------------
+				// Fetch Workast token
+				//---------------------------------------------------
+				q = {"criteria":"userid=" + user.get("id")};
+				db = zoho.cliq.getRecords("workastdb",q);
+				apitoken = db.get("list").get(0).get("apitoken");
+				workHeaders = {"Authorization":"Bearer " + apitoken};
+				//---------------------------------------------------
+				// Get Workast spaces
+				//---------------------------------------------------
+				spaces = invokeurl
+				[
+					url :"https://api.todobot.io/list"
+					type :GET
+					headers:workHeaders
+				];
+				//---------------------------------------------------
+				// Find space
+				//---------------------------------------------------
+				spaceId = "";
+				for each  sp in spaces
+				{
+					if(sp.get("name") != null && sp.get("name").toLowerCase() == spaceName.toLowerCase())
+					{
+						spaceId = sp.get("id");
+						break;
+					}
+				}
+				if(spaceId == "")
+				{
+					response.put("text","❌ Space not found: " + spaceName);
+					return response;
+				}
+				//---------------------------------------------------
+				// Build task body
+				//---------------------------------------------------
+				taskBody = Map();
+				taskBody.put("text",taskName);
+				// Handle assignee emails
+				if(assigneeEmails == null || assigneeEmails.isEmpty())
+				{
+					// Assign to current user if no assignee specified
+					assignedEmailArray = list();
+					assignedEmailArray.add(user.get("email"));
+					taskBody.put("assignedToEmail",assignedEmailArray);
+				}
+				else
+				{
+					// Use the emails from AI (already an array)
+					taskBody.put("assignedToEmail",assigneeEmails);
+				}
+				if(dueDate != "" && dueDate != null)
+				{
+					taskBody.put("dueDate",dueDate + "T00:00:00.000Z");
+				}
+				//---------------------------------------------------
+				// Debug
+				//---------------------------------------------------
+				info "Task Body: " + taskBody;
+				//---------------------------------------------------
+				// Create task
+				//---------------------------------------------------
+				created = invokeurl
+				[
+					url :"https://api.todobot.io/list/" + spaceId + "/task"
+					type :POST
+					parameters:taskBody.toString()
+					headers:{"Authorization":"Bearer " + apitoken,"Content-Type":"application/json"}
+				];
+				//---------------------------------------------------
+				// Extract Task details
+				//---------------------------------------------------
+				taskId = "";
+				if(created.containsKey("_id"))
+				{
+					taskId = created.get("_id");
+				}
+				else if(created.containsKey("id"))
+				{
+					taskId = created.get("id");
+				}
+				taskLink = created.get("link");
+				if(taskLink == null || taskLink == "")
+				{
+					taskLink = "https://app.workast.io";
+				}
+				// Get assignee names
+				assigneeNames = "Not assigned";
+				if(assigneeEmails != null && !assigneeEmails.isEmpty())
+				{
+					assigneeNames = "";
+					for each  email in assigneeEmails
+					{
+						if(assigneeNames != "")
+						{
+							assigneeNames = assigneeNames + ", ";
+						}
+						assigneeNames = assigneeNames + email;
+					}
+				}
+				// Format due date
+				formattedDueDate = "Not set";
+				if(dueDate != null && dueDate != "")
+				{
+					formattedDueDate = dueDate;
+				}
+				//---------------------------------------------------
+				// Motivational quotes (random selection)
+				//---------------------------------------------------
+				quotes = list();
+				quotes.add("You seem more productive today! 🚀 Keep up the great work!");
+				quotes.add("Another task conquered! 💪 You're on fire today!");
+				quotes.add("Productivity level: Expert! 🌟 Amazing job!");
+				quotes.add("You're crushing it today! 🎯 Way to stay organized!");
+				quotes.add("Task master mode activated! 🏆 Keep the momentum going!");
+				quotes.add("Efficiency at its finest! ⚡ You're doing great!");
+				randomIndex = randomnumber(0,quotes.size());
+				motivationalQuote = quotes.get(randomIndex);
+				//---------------------------------------------------
+				// BUILD CARD RESPONSE
+				//---------------------------------------------------
+				response = Map();
+				// Bot info
+				bot = Map();
+				bot.put("name","Workast AI");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				// Card
+				card = Map();
+				card.put("title","🎉New Task Created:\n" + taskName);
+				card.put("theme","modern-inline");
+				response.put("card",card);
+				// Buttons
+				buttonsList = list();
+				buttonsList0 = Map();
+				buttonsList0.put("label","View Task");
+				action0 = Map();
+				action0.put("type","open.url");
+				data0 = Map();
+				data0.put("web",taskLink);
+				action0.put("data",data0);
+				buttonsList0.put("action",action0);
+				buttonsList.add(buttonsList0);
+				buttonsList1 = Map();
+				buttonsList1.put("label","More Details");
+				buttonsList1.put("type","+");
+				action1 = Map();
+				action1.put("type","invoke.function");
+				data1 = Map();
+				data1.put("name","viewtaskdetails");
+				action1.put("data",data1);
+				buttonsList1.put("action",action1);
+				buttonsList1.put("key","task_details|" + taskId + "|" + spaceId);
+				buttonsList.add(buttonsList1);
+				response.put("buttons",buttonsList);
+				// Text message
+				response.put("text",motivationalQuote + "\n\n" + "📂 *Space:* " + spaceName + "\n" + "📅 *Due Date:* " + formattedDueDate + "\n" + "👤 *Assigned To:* " + assigneeNames);
+				return response;
+			}
+			catch (e)
+			{
+				banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+				return banner;
+			}
+		}
+	}
+	else if(msg.contains("https://open.workast.app") && msg.contains("/task/"))
+	{
+		info "🔗 Workast link detected inside message";
+		//--------------------------------------------
+		// EXTRACT URL FROM MESSAGE
+		//--------------------------------------------
+		start = msg.indexOf("https://open.workast.app");
+		sub = msg.substring(start,msg.length());
+		// end at space or newline
+		end = sub.length();
+		urlFound = sub.substring(0,end).trim();
+		info "Extracted URL: " + urlFound;
+		//--------------------------------------------
+		// EXTRACT TASK ID USING toList()
+		//--------------------------------------------
+		taskId = "";
+		if(urlFound.contains("/task/"))
+		{
+			partsList = urlFound.toList("/task/");
+			if(partsList.size() > 1)
+			{
+				taskId = partsList.get(1);
+				// Clean up task ID - remove any trailing characters
+				if(taskId.contains("?"))
+				{
+					taskId = taskId.toList("?").get(0);
+				}
+				if(taskId.contains(" "))
+				{
+					taskId = taskId.toList(" ").get(0);
+				}
+				if(taskId.contains("\n"))
+				{
+					taskId = taskId.toList("\n").get(0);
+				}
+				taskId = taskId.trim();
+			}
+		}
+		if(taskId == "")
+		{
+			info "❌ Could not extract task ID";
+			return Map();
+		}
+		info "Task ID: " + taskId;
+		//--------------------------------------------
+		// GET USER TOKEN
+		//--------------------------------------------
+		tokenQuery = Map();
+		tokenQuery.put("criteria","userid=" + user.get("id"));
+		tokenData = zoho.cliq.getRecords("workastdb",tokenQuery);
+		if(tokenData.get("list").size() == 0)
+		{
+			response = Map();
+			bot = Map();
+			bot.put("name","Workast");
+			bot.put("image","https://cdn.workast.io/avatar.png");
+			response.put("bot",bot);
+			response.put("text","🔗 Workast task detected.\nPlease connect your account using `/workast connect`.");
+			return response;
+		}
+		apikey = tokenData.get("list").get(0).get("apitoken");
+		//--------------------------------------------
+		// FETCH TASK DETAILS
+		//--------------------------------------------
+		apiUrl = "https://api.todobot.io/task/" + taskId;
+		// Create headers map with unique variable name
+		apiHeaders = Map();
+		apiHeaders.put("Authorization","Bearer " + apikey);
+		apiHeaders.put("Content-Type","application/json");
+		taskData = invokeurl
+		[
+			url :apiUrl
+			type :GET
+			headers:apiHeaders
+		];
+		info "Task data fetched: " + taskData;
+		//--------------------------------------------
+		// BUILD THE UNFURL CARD
+		//--------------------------------------------
+		taskTitle = ifnull(taskData.get("text"),"Untitled Task");
+		taskShort = ifnull(taskData.get("shortId"),"");
+		taskStatus = ifnull(taskData.get("status"),"pending");
+		taskDueDate = ifnull(taskData.get("dueDate"),"No due date");
+		taskLink = ifnull(taskData.get("link"),urlFound);
+		// Get space name
+		spaceName = "Unknown";
+		listId = "";
+		lst = taskData.get("list");
+		if(lst != null)
+		{
+			listId = ifnull(lst.get("id"),"");
+			raw = ifnull(lst.get("name"),"");
+			if(raw.contains("||"))
+			{
+				spaceName = raw.toList("||").get(0);
+			}
+			else
+			{
+				spaceName = raw;
+			}
+		}
+		// Get assignee info
+		assignedTo = taskData.get("assignedTo");
+		assigneeNames = "Unassigned";
+		if(assignedTo != null && assignedTo.size() > 0)
+		{
+			assigneeList = list();
+			for each  assignee in assignedTo
+			{
+				assigneeName = ifnull(assignee.get("name"),"");
+				if(assigneeName != "")
+				{
+					assigneeList.add(assigneeName);
+				}
+			}
+			if(assigneeList.size() > 0)
+			{
+				assigneeNames = assigneeList.toString(", ");
+			}
+		}
+		// Format status
+		statusDisplay = taskStatus.proper();
+		if(taskStatus == "pending")
+		{
+			statusDisplay = "⏳ Pending";
+		}
+		else if(taskStatus == "completed" || taskStatus == "done")
+		{
+			statusDisplay = "✅ Completed";
+		}
+		// Build card
+		card = Map();
+		card.put("theme","modern-inline");
+		card.put("thumbnail","https://cdn.workast.io/avatar.png");
+		slides = list();
+		// Slide 1: Task Info
+		slide1 = Map();
+		slide1.put("type","text");
+		slide1.put("title","📝 #" + taskShort + " - " + taskTitle);
+		slide1.put("data","**Space:** " + spaceName + "\n**Status:** " + statusDisplay);
+		slides.add(slide1);
+		// Slide 2: Details
+		slide2 = Map();
+		slide2.put("type","label");
+		dataList = list();
+		data1 = Map();
+		data1.put("👤 Assigned To",assigneeNames);
+		dataList.add(data1);
+		data2 = Map();
+		data2.put("📅 Due Date",taskDueDate);
+		dataList.add(data2);
+		slide2.put("data",dataList);
+		// Add buttons
+		buttonsList = list();
+		btn1 = Map();
+		btn1.put("label","View Task");
+		action1 = Map();
+		action1.put("type","open.url");
+		actionData1 = Map();
+		actionData1.put("web",taskLink);
+		action1.put("data",actionData1);
+		btn1.put("action",action1);
+		buttonsList.add(btn1);
+		// Only add these buttons if the functions exist
+		btn2 = Map();
+		btn2.put("label","More Details");
+		btn2.put("type","+");
+		action2 = Map();
+		action2.put("type","invoke.function");
+		actionData2 = Map();
+		actionData2.put("name","viewtaskdetails");
+		action2.put("data",actionData2);
+		btn2.put("action",action2);
+		btn2.put("key","task_details|" + taskId + "|" + listId);
+		buttonsList.add(btn2);
+		slide2.put("buttons",buttonsList);
+		slides.add(slide2);
+		// Build response
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		response.put("card",card);
+		response.put("slides",slides);
+		response.put("text","🔗 Workast Task Preview");
+		return response;
+	}
+	// Continue to the rest of your message handler logic…
+	else
+	{
+		funnyQuotes = list();
+		funnyQuotes.add("“I tried understanding your message… now my CPU needs a vacation.” 🤯😂");
+		funnyQuotes.add("“Bro… even Google couldn’t search what you just typed.” 😭");
+		funnyQuotes.add("“That moment when the bot stares at your text like: 🤨”");
+		funnyQuotes.add("“If confusion was an Olympic sport, you'd win gold for that message.” 🥇");
+		funnyQuotes.add("“Plot twist: even I’m AI and *I* don't know what that meant.” 🤖✨");
+		funnyQuotes.add("“Processing your message... Error 404: Meaning Not Found.” 🥲");
+		funnyQuotes.add("“Your text has the same clarity as my sleep schedule.” 😴");
+		funnyQuotes.add("“Keyboard okay? Or are you just pressing vibes?” 🎹😂");
+		funnyQuotes.add("“You unlocked a new level of randomness. Respect.” 🔥");
+		funnyQuotes.add("“That input was so wild even ChatGPT would rage quit.” 💀");
+		// Pick a random quote
+		randomIndex = randomnumber(0,funnyQuotes.size());
+		quote = funnyQuotes.get(randomIndex);
+		// Build final message
+		responseText = "👋 Hey " + user.get("first_name") + "! \n\n" + "🤖 Add `--ai` to activate AI task actions (create/update/delete)\n\n" + "🃏 " + quote + "\n\n" + "---\n\n" + "## 📋 *Available Workast Commands*\n" + "•```/workast create a task``` — Create a task\n" + "• ```/workast view space``` — View all spaces\n" + "• ```/workast create space``` — Create a new space\n" + "• ```/workast map channel``` — Connect Workast to this channel\n" + "• ```/workast un map channel``` — Disconnect Workast\n" + "• ```/workast create note``` — Create a note\n" + "• ```/workast view note``` — View notes\n\n" + "---\n\n" + "## 🤖 *AI Commands (Smart Mode)*\n" + "• ```get space health Your Space Name --ai``` — Analyse your space health\n" + "• ```analyse today tasks --ai```-- AI reviews your today's tasks\n" + "• ```create task <taskName> <spaceName> --ai```\n" + "• ```update task <update> --ai```\n" + "• ```delete task <task> --ai```\n\n" + "---\n" + "🪄 *Tip:* If you are Trying add the above message as a comment to an task click the 3 dots and click goto more🔥";
+		// Return this
+		response = Map();
+		bot = Map();
+		bot.put("name","Workast Bot");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		card = Map();
+		card.put("title","Need Help");
+		card.put("thumbnail","https://cdn.workast.io/avatar.png");
+		card.put("theme","modern-inline");
+		response.put("card",card);
+		response.put("text",responseText);
+		return response;
+	}
+}
+// -------------------------------------------------------
+// FALLBACK RESPONSE
+// -------------------------------------------------------
+response.put("text","Hi! Add --ai to activate AI task actions (create/update/delete).");
+return response;

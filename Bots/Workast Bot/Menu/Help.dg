@@ -1,0 +1,54 @@
+
+response = Map();
+card = Map();
+card.put("title","Workast Help");
+card.put("icon","https://cdn.workast.io/avatar.png");
+card.put("theme","modern-inline");
+response.put("card",card);
+slidesList = list();
+// ================= SLIDE 1 (IMAGE) =================
+slidesList0 = Map();
+slidesList0.put("type","images");
+slidesList0.put("title","Workast for Zoho Cliq");
+dataList = list();
+dataList.add("https://image2url.com/images/1764477303206-10c57cfe-8281-46fd-98f0-aea5c968c71d.jpg");
+slidesList0.put("data",dataList);
+slidesList.add(slidesList0);
+// ================= SLIDE 2 (TEXT) =================
+slidesList1 = Map();
+slidesList1.put("type","text");
+slidesList1.put("data","*Workast:* Manage your team's tasks, spaces, and notes inside Zoho Cliq.\n\n" + "### Workast Task Updates 🗓️:\n" + "Get instant notifications for new tasks, updates, and due tasks.\n\n" + "*Switch Account:* Change your connected Workast account.\n");
+// ================= SWITCH ACCOUNT BUTTON =================
+buttonsList1 = list();
+buttonsList0 = Map();
+buttonsList0.put("label","Switch Account 🔗");
+buttonsList0.put("type","+");
+action = Map();
+action.put("type","invoke.function");
+data = Map();
+data.put("name","triggerlinkaccount");
+action.put("data",data);
+buttonsList0.put("action",action);
+buttonsList1.add(buttonsList0);
+// ================= NEXT PAGE BUTTON =================
+buttonsList = list();
+buttonsList0 = Map();
+buttonsList0.put("label","Next Page ➡️");
+buttonsList0.put("type","+");
+action = Map();
+action.put("type","invoke.function");
+data = Map();
+data.put("name","viewcontent");
+action.put("data",data);
+buttonsList0.put("action",action);
+buttonsList0.put("key","help_next_page_1");
+// same logic as Basecamp
+buttonsList.add(buttonsList0);
+// Attach inside slide
+slidesList1.put("buttons",buttonsList1);
+slidesList.add(slidesList1);
+// ================= FINAL RESPONSE =================
+response.put("slides",slidesList);
+response.put("text","Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ") 👋 Manage your Workast tasks, spaces, notes, and channel mappings directly from Zoho Cliq!");
+response.put("buttons",buttonsList);
+return response;

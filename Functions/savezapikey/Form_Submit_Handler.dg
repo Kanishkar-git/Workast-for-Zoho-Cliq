@@ -1,0 +1,79 @@
+
+// =======================================================
+// SAVE ZAPIKEY FUNCTION
+// Function name: savezapikey
+// Called when user submits webhook token form
+// =======================================================
+try 
+{
+	//----------------------------------------------------
+	// GET FORM VALUES
+	//----------------------------------------------------
+	formValues = form.get("values");
+	webhookToken = formValues.get("webhooktoken");
+	// Validate token
+	if(webhookToken == null || webhookToken.trim() == "")
+	{
+		return {"text":"❌ Webhook token is required. Please try again."};
+	}
+	//----------------------------------------------------
+	// CHECK IF ZAPIKEY ALREADY EXISTS
+	//----------------------------------------------------
+	query_zapikey = Map();
+	query_zapikey.put("criteria","userid=" + user.get("id").toString());
+	db_zapikey = zoho.cliq.getRecords("workastzapikey",query_zapikey);
+	if(db_zapikey.get("list").size() > 0)
+	{
+		// Token already exists
+		return {"text":"⚠️ Webhook token already exists for your account. You can proceed to map channels."};
+	}
+	//----------------------------------------------------
+	// CREATE NEW RECORD
+	//----------------------------------------------------
+	record = Map();
+	record.put("userid",user.get("id").toString());
+	record.put("zapikey",webhookToken.trim());
+	insertResult = zoho.cliq.createRecord("workastzapikey",record);
+	if(insertResult.get("status") != "SUCCESS")
+	{
+		return {"text":"❌ Failed to save webhook token. Please try again."};
+	}
+	//----------------------------------------------------
+	// SUCCESS RESPONSE WITH MAP CHANNEL BUTTON
+	//----------------------------------------------------
+	response = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("title","✅ Webhook Token Saved!");
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	buttons = list();
+	btn = Map();
+	btn.put("label","Map Channel Now");
+	btn.put("type","+");
+	action = Map();
+	action.put("type","invoke.function");
+	data = Map();
+	data.put("name","mapchannelform");
+	action.put("data",data);
+	btn.put("action",action);
+	buttons.add(btn);
+	response.put("buttons",buttons);
+	response.put("text","🎉 *Success!* Your webhook token has been saved.\n\n" + "This was a one-time setup and you won't need to do this again.\n\n" + "You can now proceed to map your channels and start receiving notifications!\n\n" + "Click *'Map Channel Now'* to continue. 🚀");
+	return response;
+}
+catch (e)
+{
+	info "Error in savezapikey: " + e;
+	result = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	result.put("bot",bot);
+	result.put("text","❌ Error saving webhook token: " + e.toString());
+	return result;
+}
+return Map();

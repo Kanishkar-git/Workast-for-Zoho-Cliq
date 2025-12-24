@@ -1,0 +1,212 @@
+
+response = Map();
+try 
+{
+	//---------------------------------------------------
+	// 1) Parse the key to determine action
+	//---------------------------------------------------
+	key = arguments.get("key");
+	if(key == null || key == "")
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"❌ Invalid request. Missing action information."};
+	}
+	parts = key.toList("|");
+	action = parts.get(0);
+	// "toggle" or "delete"
+	taskId = parts.get(1);
+	//---------------------------------------------------
+	// 2) Fetch User Credentials
+	//---------------------------------------------------
+	query = {"criteria":"userid=" + user.get("id").toString()};
+	db = zoho.cliq.getRecords("workastdb",query);
+	rows = db.get("list");
+	if(rows == null || rows.size() == 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"⚠️ Your Workast account is not linked. Please connect first."};
+	}
+	row = rows.get(0);
+	apiToken = row.get("apitoken");
+	headers = Map();
+	headers.put("Authorization","Bearer " + apiToken);
+	headers.put("Accept","application/json");
+	//---------------------------------------------------
+	// 3) Execute based on action
+	//---------------------------------------------------
+	if(action == "toggle")
+	{
+		// TOGGLE STATUS LOGIC
+		currentStatus = parts.get(2);
+		if(currentStatus == "done" || currentStatus == "completed")
+		{
+			resp = invokeurl
+			[
+				url :"https://api.todobot.io/task/" + taskId + "/undone"
+				type :POST
+				headers:headers
+			];
+			newStatus = "pending";
+		}
+		else
+		{
+			resp = invokeurl
+			[
+				url :"https://api.todobot.io/task/" + taskId + "/done"
+				type :POST
+				headers:headers
+			];
+			newStatus = "completed";
+		}
+		// SUCCESS RESPONSE FOR TOGGLE
+		response = Map();
+		response.put("text","Hello " + user.get("first_name") + "\n\n" + "You have successfully updated the status of the task to *" + newStatus + "*.\n\n" + "Keep rocking🔥\n");
+		bot = Map();
+		bot.put("name","Workast Bot");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		card = Map();
+		card.put("title","🎉 Task Status Toggled");
+		card.put("thumbnail","https://cdn.workast.io/avatar.png");
+		card.put("theme","modern-inline");
+		response.put("card",card);
+		return response;
+	}
+	else if(action == "delete")
+	{
+		// DELETE TASK LOGIC
+		// Fetch task details for title
+		task = invokeurl
+		[
+			url :"https://api.todobot.io/task/" + taskId
+			type :GET
+			headers:headers
+		];
+		taskTitle = "Task";
+		if(task != null && task.get("text") != null)
+		{
+			taskTitle = task.get("text");
+		}
+		if(taskTitle.length() > 50)
+		{
+			taskTitle = taskTitle.substring(0,47) + "..";
+		}
+		// Delete the task
+		deleteResp = invokeurl
+		[
+			url :"https://api.todobot.io/task/" + taskId
+			type :DELETE
+			headers:headers
+		];
+		// SUCCESS RESPONSE FOR DELETE
+		response = Map();
+		response.put("text","Hello " + user.get("first_name") + "\n\n" + "You have successfully *deleted* the task:\n\n" + "*" + taskTitle + "*\n\n" + "Keep rocking🔥\n");
+		bot = Map();
+		bot.put("name","Workast Bot");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		card = Map();
+		card.put("title","🗑️ Task Deleted Successfully");
+		card.put("thumbnail","https://cdn.workast.io/avatar.png");
+		card.put("theme","modern-inline");
+		response.put("card",card);
+		return response;
+	}
+	else if(action == "update")
+	{
+		// ============================================
+		// UPDATE TASK FORM LOGIC
+		// ============================================
+		// Fetch task details
+		task = invokeurl
+		[
+			url :"https://api.todobot.io/task/" + taskId
+			type :GET
+			headers:headers
+		];
+		// Build form inputs
+		inputs = List();
+		// Hidden field: Task ID
+		hidden1 = Map();
+		hidden1.put("label","Task ID");
+		hidden1.put("name","taskid");
+		hidden1.put("type","text");
+		hidden1.put("value",taskId);
+		hidden1.put("placeholder","Task ID");
+		hidden1.put("disabled",true);
+		inputs.add(hidden1);
+		// Input 1: Title (mandatory)
+		taskTitle = "";
+		if(task.get("text") != null)
+		{
+			taskTitle = task.get("text");
+		}
+		in1 = Map();
+		in1.put("label","Title");
+		in1.put("name","title");
+		in1.put("placeholder","Enter task title");
+		in1.put("type","text");
+		in1.put("value",taskTitle);
+		in1.put("mandatory",true);
+		inputs.add(in1);
+		// Input 2: Description
+		taskDescription = "";
+		if(task.get("description") != null)
+		{
+			taskDescription = task.get("description");
+		}
+		in2 = Map();
+		in2.put("label","Description");
+		in2.put("name","description");
+		in2.put("placeholder","Enter task description");
+		in2.put("type","textarea");
+		in2.put("value",taskDescription);
+		inputs.add(in2);
+		// Input 3: Due Date
+		taskDueDate = "";
+		if(task.get("dueDate") != null && task.get("dueDate") != "")
+		{
+			// Convert from ISO format "2025-11-27T00:00:00.000Z" to "2025-11-27"
+			isoDueDate = task.get("dueDate");
+			taskDueDate = isoDueDate.subString(0,10);
+		}
+		in3 = Map();
+		in3.put("label","Due Date");
+		in3.put("name","due");
+		in3.put("placeholder","Select due date");
+		in3.put("type","date");
+		if(taskDueDate != "")
+		{
+			in3.put("value",taskDueDate);
+		}
+		inputs.add(in3);
+		// Build form
+		form = Map();
+		form.put("type","form");
+		form.put("title","Update Task");
+		form.put("name","updateTaskForm");
+		form.put("button_label","Save Changes");
+		form.put("inputs",inputs);
+		// Submit action
+		submit = Map();
+		submit.put("type","invoke.function");
+		submit.put("name","updateTask");
+		// Add required actions block
+		actions = Map();
+		actions.put("submit",submit);
+		form.put("actions",actions);
+		return form;
+	}
+	else
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"❌ Invalid action: " + action};
+	}
+}
+catch (e)
+{
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	card = {"title":"Action Failed ⚠️","theme":"modern-inline"};
+	return {"bot":bot,"card":card,"text":"❌ Failed to complete action: " + e + "\n\nPlease try again or contact support if the issue persists."};
+}
+return response;

@@ -1,0 +1,165 @@
+
+result = Map();
+try 
+{
+	//--------------------------------------------------
+	// ✅ STEP 1: SHOW FORM IF NOT SUBMITTED
+	//--------------------------------------------------
+	if(form == null || !form.containsKey("values"))
+	{
+		response = Map();
+		response.put("type","form");
+		response.put("title","Create New Space");
+		response.put("name","createSpaceForm");
+		response.put("submit_label","Create");
+		inputs = List();
+		nameInput = Map();
+		nameInput.put("type","text");
+		nameInput.put("name","name");
+		nameInput.put("label","Space Name");
+		nameInput.put("placeholder","Enter space name");
+		nameInput.put("mandatory",true);
+		descInput = Map();
+		descInput.put("type","textarea");
+		descInput.put("name","description");
+		descInput.put("label","Description");
+		descInput.put("placeholder","Enter description");
+		typeOptions = List();
+		typeOptions.add({"label":"Group","value":"group"});
+		typeOptions.add({"label":"Personal","value":"personal"});
+		typeInput = Map();
+		typeInput.put("type","select");
+		typeInput.put("name","type");
+		typeInput.put("label","Space Type");
+		typeInput.put("options",typeOptions);
+		privacyOptions = List();
+		privacyOptions.add({"label":"Private","value":"private"});
+		privacyOptions.add({"label":"Public","value":"public"});
+		privacyInput = Map();
+		privacyInput.put("type","select");
+		privacyInput.put("name","privacy");
+		privacyInput.put("label","Privacy");
+		privacyInput.put("options",privacyOptions);
+		inputs.add(nameInput);
+		inputs.add(descInput);
+		inputs.add(typeInput);
+		inputs.add(privacyInput);
+		response.put("inputs",inputs);
+		response.put("action",{"type":"invoke.function","name":"createGroup"});
+		return response;
+	}
+	//--------------------------------------------------
+	// ✅ STEP 2: READ FORM VALUES
+	//--------------------------------------------------
+	formValues = form.get("values");
+	spaceName = formValues.get("name");
+	spaceDescription = formValues.get("description");
+	spaceType = "group";
+	if(formValues.containsKey("type") && formValues.get("type") != null)
+	{
+		spaceType = formValues.get("type").get("value");
+	}
+	spacePrivacy = "private";
+	if(formValues.containsKey("privacy") && formValues.get("privacy") != null)
+	{
+		spacePrivacy = formValues.get("privacy").get("value");
+	}
+	//--------------------------------------------------
+	// ✅ VALIDATION
+	//--------------------------------------------------
+	if(spaceName == null || spaceName.trim() == "")
+	{
+		return {"text":"⚠️ Space name is required!"};
+	}
+	//--------------------------------------------------
+	// ✅ FETCH API TOKEN
+	//--------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id"));
+	db = zoho.cliq.getRecords("workastdb",query);
+	if(db.get("status") != "SUCCESS" || db.get("list").size() == 0)
+	{
+		return {"text":"❌ Please link your Workast account first."};
+	}
+	apitoken = db.get("list").get(0).get("apitoken");
+	//--------------------------------------------------
+	// ✅ BUILD REQUEST BODY
+	//--------------------------------------------------
+	body = Map();
+	body.put("name",spaceName);
+	body.put("type",spaceType);
+	body.put("privacy",spacePrivacy);
+	if(spaceDescription != null && spaceDescription.trim() != "")
+	{
+		body.put("description",spaceDescription);
+	}
+	//--------------------------------------------------
+	// ✅ CREATE SPACE API CALL
+	//--------------------------------------------------
+	info body;
+	createResponse = invokeurl
+	[
+		url :"https://api.todobot.io/list"
+		type :POST
+		parameters:body
+		headers:{"Authorization":"Bearer " + apitoken}
+	];
+	info createResponse;
+	createdName = createResponse.get("name");
+	createdLink = createResponse.get("link");
+	//--------------------------------------------------
+	// ✅ SUCCESS MESSAGE
+	//--------------------------------------------------
+	// 	result.put("text","✅ Space Created Successfully: " + createdName);
+	// 	if(createdLink != null)
+	// 	{
+	// 		openBtn = Map();
+	// 		openBtn.put("label","🔗 Open Space");
+	// 		openBtn.put("type","open.url");
+	// 		openBtn.put("url","createdLink");
+	// 		btnList = List();
+	// 		btnList.add(openBtn);
+	// 		result.put("buttons",btnList);
+	// 	}
+	// 	return result;
+	//--------------------------------------------------
+	// ✅ SUCCESS MESSAGE
+	//--------------------------------------------------
+	if(createdLink != null)
+	{
+		response = Map();
+		response.put("text","Hello " + user.get("first_name") + " 👋\n\nYou have successfully created a new space!\n\n*Space Name:* " + createdName + "\n\nKeep rocking 🔥");
+		bot = Map();
+		bot.put("name","Workast Bot");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		card = Map();
+		card.put("title","✅ Space Created Successfully");
+		card.put("thumbnail","https://cdn.workast.io/avatar.png");
+		card.put("theme","modern-inline");
+		response.put("card",card);
+		buttonsList = list();
+		buttonsList0 = Map();
+		buttonsList0.put("label","Open Space");
+		buttonsList0.put("type","+");
+		// ✅ Added button type
+		action = Map();
+		action.put("type","open.url");
+		data = Map();
+		data.put("web",createdLink);
+		// ✅ Use the actual space link variable
+		action.put("data",data);
+		buttonsList0.put("action",action);
+		buttonsList.add(buttonsList0);
+		response.put("buttons",buttonsList);
+		// return response;
+	}
+	return response;
+	// 	Verify the JSON key pattern for type. The error occurred at the following location: buttons[0] > type
+}
+catch (e)
+{
+	info e;
+	return {"text":"❌ Failed to create space.\n" + e.toString()};
+}
+return Map();

@@ -1,0 +1,162 @@
+
+// =======================================================
+// REUSABLE LINK CHECKER - Use in any command handler
+// =======================================================
+try 
+{
+	//----------------------------------------------------
+	// CHECK IF USER IS LINKED
+	//----------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id").toString());
+	db = zoho.cliq.getRecords("workastdb",query);
+	// If user NOT linked -> Ask to link
+	if(db.get("status") != "SUCCESS" || db.get("list").size() == 0)
+	{
+		result = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		result.put("bot",bot);
+		card = Map();
+		card.put("title","🔗 Link Your Workast Account");
+		card.put("theme","modern-inline");
+		result.put("card",card);
+		buttons = List();
+		// Button 1: Get API Token
+		b1 = Map();
+		b1.put("label","Get API Token");
+		b1.put("type","+");
+		a1 = Map();
+		a1.put("type","open.url");
+		d1 = Map();
+		d1.put("web","https://my.workast.com/login/email");
+		a1.put("data",d1);
+		b1.put("action",a1);
+		buttons.add(b1);
+		// Button 2: Link Account
+		b2 = Map();
+		b2.put("label","Link Account");
+		b2.put("type","+");
+		a2 = Map();
+		a2.put("type","invoke.function");
+		d2 = Map();
+		d2.put("name","commonTokenAction");
+		a2.put("data",d2);
+		b2.put("action",a2);
+		b2.put("key","apikeyform");
+		buttons.add(b2);
+		result.put("buttons",buttons);
+		result.put("text","👋 Hey [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ")!\n\n" + "⚠️ **Your Workast account is not linked yet.**\n\n" + "To use Workast with Zoho Cliq, please connect your account:\n\n" + "📝 **Steps:**\n" + "1. Click **'Get API Token'** → Go to Workast settings\n" + "2. Copy your API token\n" + "3. Click **'Link Account'** → Paste the token\n\n" + "💡 Don't have an account? [Sign up here](https://workast.com/signup)");
+		return result;
+	}
+	else
+	{
+		//----------------------------------------------------
+		// USER IS LINKED -> PROCEED WITH YOUR COMMAND
+		//----------------------------------------------------
+		apitoken = db.get("list").get(0).get("apitoken");
+		teamid = db.get("list").get(0).get("workastid");
+		teamname = db.get("list").get(0).get("teamname");
+		try 
+		{
+			info teamname;
+			response = Map();
+			response.put("type","form");
+			response.put("title","Create a  new Space");
+			response.put("name","marathon");
+			response.put("button_label","Submit");
+			inputsList = list();
+			projectname = {"label":"Project Name","name":"projectname","type":"text","placeholder":teamname,"value":teamname,"disabled":true};
+			inputsList.add(projectname);
+			inputsList0 = Map();
+			inputsList0.put("label","Space Name");
+			inputsList0.put("name","name");
+			inputsList0.put("placeholder","Type the name of the space");
+			inputsList0.put("min_length","0");
+			inputsList0.put("max_length","100");
+			inputsList0.put("mandatory",false);
+			inputsList0.put("type","text");
+			inputsList.add(inputsList0);
+			inputsList1 = Map();
+			inputsList1.put("label","Description");
+			inputsList1.put("name","description");
+			inputsList1.put("placeholder","Description about the space");
+			inputsList1.put("min_length","0");
+			inputsList1.put("max_length","250");
+			inputsList1.put("mandatory",false);
+			inputsList1.put("type","textarea");
+			inputsList.add(inputsList1);
+			inputsList2 = Map();
+			inputsList2.put("label","Privacy");
+			inputsList2.put("name","privacy");
+			inputsList2.put("placeholder","Select the type");
+			inputsList2.put("multiple",false);
+			inputsList2.put("mandatory",false);
+			inputsList2.put("type","dynamic_select");
+			optionsList = list();
+			optionsList0 = Map();
+			optionsList0.put("value","team");
+			optionsList0.put("label","Team");
+			optionsList.add(optionsList0);
+			optionsList1 = Map();
+			optionsList1.put("value","private");
+			optionsList1.put("label","Private");
+			optionsList.add(optionsList1);
+			inputsList2.put("options",optionsList);
+			inputsList.add(inputsList2);
+			inputsList3 = Map();
+			inputsList3.put("label","Type");
+			inputsList3.put("name","type");
+			inputsList3.put("placeholder","Choose from the list of options");
+			inputsList3.put("multiple",false);
+			inputsList3.put("mandatory",false);
+			inputsList3.put("type","dynamic_select");
+			optionsList = list();
+			optionsList0 = Map();
+			optionsList0.put("value","group");
+			optionsList0.put("label","Group");
+			optionsList.add(optionsList0);
+			optionsList1 = Map();
+			optionsList1.put("value","direct");
+			optionsList1.put("label","Direct");
+			optionsList.add(optionsList1);
+			optionsList2 = Map();
+			optionsList2.put("value","template");
+			optionsList2.put("label","Template");
+			optionsList.add(optionsList2);
+			inputsList3.put("options",optionsList);
+			inputsList.add(inputsList3);
+			response.put("inputs",inputsList);
+			action = Map();
+			action.put("type","invoke.function");
+			action.put("name","createGroup");
+			response.put("action",action);
+			return response;
+		}
+		catch (e)
+		{
+			result = Map();
+			bot = Map();
+			bot.put("name","Workast");
+			bot.put("image","https://cdn.workast.io/avatar.png");
+			result.put("bot",bot);
+			result.put("text","❌ Error fetching team details. Please try again.");
+			return result;
+		}
+		// -------------------------------------------------
+		// YOUR CODE ENDS HERE
+	}
+}
+catch (e)
+{
+	info "Error: " + e;
+	result = Map();
+	bot = Map();
+	bot.put("name","Workast");
+	bot.put("image","https://cdn.workast.io/avatar.png");
+	result.put("bot",bot);
+	result.put("text","❌ An error occurred: " + e.toString());
+	return result;
+}
+return Map();

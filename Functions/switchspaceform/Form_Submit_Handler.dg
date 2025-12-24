@@ -1,0 +1,108 @@
+
+response = Map();
+try 
+{
+	//---------------------------------------------------
+	// ✅ 1. FETCH USER TOKEN FROM DB
+	//---------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id").toString());
+	db = zoho.cliq.getRecords("workastdb",query);
+	rows = db.get("list");
+	if(rows == null || rows.size() == 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"⚠️ Account not linked. Please connect Workast first."};
+	}
+	row = rows.get(0);
+	apiToken = row.get("apitoken");
+	teamname = row.get("teamname");
+	headers = Map();
+	headers.put("Authorization","Bearer " + apiToken);
+	//---------------------------------------------------
+	// ✅ 2. FETCH ALL SPACES
+	//---------------------------------------------------
+	spaces = invokeurl
+	[
+		url :"https://api.todobot.io/list"
+		type :GET
+		headers:headers
+	];
+	options = List();
+	for each  s in spaces
+	{
+		spaceName = s.get("name");
+		if(spaceName != null && spaceName.trim().toLowerCase() == "personal tasks")
+		{
+			continue;
+		}
+		if(spaceName == null || spaceName == "")
+		{
+			spaceName = "Untitled Space";
+		}
+		if(spaceName.length() > 50)
+		{
+			spaceName = spaceName.subString(0,47) + "..";
+		}
+		opt = Map();
+		opt.put("value",s.get("id"));
+		opt.put("label",spaceName);
+		opt.put("thumbnail","https://cdn.workast.io/avatar.png");
+		options.add(opt);
+	}
+	if(options.size() == 0)
+	{
+		bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+		return {"bot":bot,"text":"⚠ No spaces found for your account."};
+	}
+	//---------------------------------------------------
+	// ✅ 3. BUILD FORM INPUTS
+	//---------------------------------------------------
+	inputs = List();
+	// ✅ READ-ONLY PROJECT FIELD
+	inp1 = Map();
+	inp1.put("label","Project Name");
+	inp1.put("name","projectname");
+	inp1.put("type","text");
+	inp1.put("placeholder",teamname);
+	inp1.put("value",teamname);
+	inp1.put("disabled",true);
+	inputs.add(inp1);
+	// ✅ SPACE DROPDOWN
+	inp2 = Map();
+	inp2.put("name","spaceid");
+	inp2.put("label","Select Space");
+	inp2.put("placeholder","Choose a Space");
+	inp2.put("trigger_on_change",false);
+	inp2.put("multiple",false);
+	inp2.put("mandatory",true);
+	inp2.put("type","dynamic_select");
+	inp2.put("options",options);
+	inputs.add(inp2);
+	//---------------------------------------------------
+	// ✅ 4. FORM SUBMIT ACTION → tasksfromaspace
+	//---------------------------------------------------
+	submitAction = Map();
+	submitAction.put("type","invoke.function");
+	submitAction.put("name","loadspaceTasks");
+	actions = Map();
+	actions.put("submit",submitAction);
+	//---------------------------------------------------
+	// ✅ 5. FINAL FORM RESPONSE
+	//---------------------------------------------------
+	form = Map();
+	form.put("type","form");
+	form.put("title","View Tasks From a Space 📝");
+	form.put("name","tasksfromaspaceform");
+	form.put("version",1);
+	form.put("button_label","View Tasks");
+	form.put("actions",actions);
+	form.put("inputs",inputs);
+	return form;
+}
+catch (e)
+{
+	bot = {"name":"Workast","image":"https://cdn.workast.io/avatar.png"};
+	return {"bot":bot,"text":"❌ Error fetching spaces.\n" + e.toString()};
+}
+return Map();

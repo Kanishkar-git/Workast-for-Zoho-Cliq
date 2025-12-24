@@ -1,0 +1,120 @@
+
+// ======================================================================
+// WORKAST — TASK REMINDER USING NEW ENDPOINT (/user/{userId}/task)
+// RETURNS CARD IN THE EXACT FORMAT YOU REQUESTED
+// ======================================================================
+// --- FETCH ALL USERS FROM DB ---
+allUsers = zoho.cliq.getRecords("workastdb",{"criteria":"id != 0"});
+if(allUsers.get("status") == "SUCCESS" && allUsers.get("list").size() > 0)
+{
+	for each  userRow in allUsers.get("list")
+	{
+		apiToken = userRow.get("apitoken");
+		workastUserId = userRow.get("workastid");
+		if(apiToken == "" || apiToken == null || workastUserId == null)
+		{
+			continue;
+		}
+		// ==================================================================
+		// BUILD QUERY
+		// ==================================================================
+		params = Map();
+		params.put("assignedTo","true");
+		params.put("statusIs","pending");
+		// ==================================================================
+		// HEADERS
+		// ==================================================================
+		headers = Map();
+		headers.put("Authorization","Bearer " + apiToken);
+		headers.put("Accept","application/json");
+		// ==================================================================
+		// CALL ENDPOINT
+		// ==================================================================
+		rawResp = invokeurl
+		[
+			url :"https://api.todobot.io/user/" + workastUserId + "/task"
+			type :GET
+			parameters:params
+			headers:headers
+		];
+		tasks = rawResp;
+		// ==================================================================
+		// BUILD TABLE ROWS
+		// ==================================================================
+		rowsList = List();
+		for each  t in tasks
+		{
+			title = t.get("text");
+			link = t.get("link");
+			dueRaw = t.get("dueDate");
+			// ---- 🔥 FIXED: DUE DATE FORMAT (Deluge-compatible) ----
+			dueRaw = t.get("dueDate");
+			if(dueRaw != null)
+			{
+				dueParts = dueRaw.toString().toList("T");
+				due = dueParts.get(0);
+				// Extract only YYYY-MM-DD
+			}
+			else
+			{
+				due = "-";
+			}
+			if(title == null)
+			{
+				title = "Untitled Task";
+			}
+			if(title.length() > 40)
+			{
+				title = title.subString(0,37) + "..";
+			}
+			assignedList = t.get("assignedTo");
+			assignedUser = if(assignedList.size() > 0,assignedList.get(0).get("name"),"-");
+			row = Map();
+			row.put("Task",title);
+			row.put("Due",due);
+			row.put("Assigned",assignedUser);
+			row.put("Open","[Open Task](" + link + ")");
+			rowsList.add(row);
+		}
+		// ==================================================================
+		// BUILD HEADERS
+		// ==================================================================
+		headersList = List();
+		headersList.add("Task");
+		headersList.add("Due");
+		headersList.add("Assigned");
+		headersList.add("Open");
+		// ==================================================================
+		// BUILD TABLE DATA
+		// ==================================================================
+		data = Map();
+		data.put("headers",headersList);
+		data.put("rows",rowsList);
+		// ==================================================================
+		// BUILD SLIDE
+		// ==================================================================
+		slide = Map();
+		slide.put("type","table");
+		slide.put("title","Pending Tasks");
+		slide.put("data",data);
+		slidesList = List();
+		slidesList.add(slide);
+		// ==================================================================
+		// FINAL CARD RESPONSE (MODIFIED TITLE + DATE FORMAT)
+		// ==================================================================
+		response = Map();
+		response.put("text","Your Workast Tasks 📝");
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		response.put("bot",bot);
+		card = Map();
+		card.put("title","🔔 Pending Workast Tasks");
+		// ⭐ UPDATED TITLE
+		card.put("theme","modern-inline");
+		response.put("card",card);
+		response.put("slides",slidesList);
+		// SEND CARD
+		zoho.cliq.postToBot("workast",response);
+	}
+}

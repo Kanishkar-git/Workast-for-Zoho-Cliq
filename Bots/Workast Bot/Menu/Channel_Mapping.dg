@@ -1,0 +1,189 @@
+
+// =======================================================
+// REUSABLE LINK CHECKER - Use in any command handler
+// =======================================================
+try 
+{
+	//----------------------------------------------------
+	// CHECK IF USER IS LINKED
+	//----------------------------------------------------
+	query = Map();
+	query.put("criteria","userid=" + user.get("id").toString());
+	db = zoho.cliq.getRecords("workastdb",query);
+	// If user NOT linked -> Ask to link
+	if(db.get("status") != "SUCCESS" || db.get("list").size() == 0)
+	{
+		result = Map();
+		bot = Map();
+		bot.put("name","Workast");
+		bot.put("image","https://cdn.workast.io/avatar.png");
+		result.put("bot",bot);
+		card = Map();
+		card.put("title","🔗 Link Your Workast Account");
+		card.put("theme","modern-inline");
+		result.put("card",card);
+		buttons = List();
+		// Button 1: Get API Token
+		b1 = Map();
+		b1.put("label","Get API Token");
+		b1.put("type","+");
+		a1 = Map();
+		a1.put("type","open.url");
+		d1 = Map();
+		d1.put("web","https://my.workast.com/login/email");
+		a1.put("data",d1);
+		b1.put("action",a1);
+		buttons.add(b1);
+		// Button 2: Link Account
+		b2 = Map();
+		b2.put("label","Link Account");
+		b2.put("type","+");
+		a2 = Map();
+		a2.put("type","invoke.function");
+		d2 = Map();
+		d2.put("name","commonTokenAction");
+		a2.put("data",d2);
+		b2.put("action",a2);
+		b2.put("key","apikeyform");
+		buttons.add(b2);
+		result.put("buttons",buttons);
+		result.put("text","👋 Hey [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ")!\n\n" + "⚠️ **Your Workast account is not linked yet.**\n\n" + "To use Workast with Zoho Cliq, please connect your account:\n\n" + "📝 **Steps:**\n" + "1. Click **'Get API Token'** → Go to Workast settings\n" + "2. Copy your API token\n" + "3. Click **'Link Account'** → Paste the token\n\n" + "💡 Don't have an account? [Sign up here](https://workast.com/signup)");
+		return result;
+	}
+	else
+	{
+		//----------------------------------------------------
+		// USER IS LINKED -> PROCEED WITH YOUR COMMAND
+		//----------------------------------------------------
+		apitoken = db.get("list").get(0).get("apitoken");
+		teamid = db.get("list").get(0).get("workastid");
+		teamname = db.get("list").get(0).get("teamname");
+		if(sub_action == "Map Channel")
+		{
+			query_zapikey = Map();
+			query_zapikey.put("criteria","userid=" + user.get("id"));
+			db_query_zapikey = zoho.cliq.getRecords("workastzapikey",query_zapikey);
+			if(db_query_zapikey.get("list").size() == 0)
+			{
+				response = Map();
+				response.put("text","Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ")\n" + "To connect *Workast* and *Cliq*, you need a *webhook token*.\n" + "Please generate one to continue.\n\n" + "*Instructions:*\n" + "*Step 1:* Click on your *Cliq Profile* (top-right)\n\n" + "*Step 2:* Select *Bots & Tools*\n\n" + "*Step 3:* Click *Webhooks* in left sidebar\n\n" + "*Step 4:* Click *Authenticate* and generate token\n\n" + "*Step 5:* Copy and paste it here\n\n" + "⚠️ We sincerely *apologize* for the inconvenience. This setup is required only once. After this, you never need to do it again!");
+				bot = Map();
+				bot.put("name","Workast Bot");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				card = Map();
+				card.put("title","⚠️ Need Webhook Token");
+				card.put("thumbnail","https://cdn.workast.io/avatar.png");
+				card.put("theme","modern-inline");
+				response.put("card",card);
+				buttonsList = list();
+				button = Map();
+				button.put("label","Paste Token");
+				button.put("type","+");
+				action = Map();
+				action.put("type","invoke.function");
+				data = Map();
+				data.put("name","commonTokenAction");
+				action.put("data",data);
+				button.put("action",action);
+				button.put("key","zapikeyform");
+				buttonsList.add(button);
+				response.put("buttons",buttonsList);
+				return response;
+			}
+			else
+			{
+				// Zapikey exists, proceed to map channel form
+				content = "Hello [" + user.get("first_name") + "](zohoid:" + user.get("zoho_user_id") + ") 👋\n\n📢 *Set Up Notifications in Zoho Cliq!*\n\nMap your channel to get instant notifications for:\n✅ New tasks created\n✅ Tasks completed\n✅ Task assignments\n✅ Comments added\n✅ Due dates changed\n\nStay notified and stay productive! 💼🔔\n\nLet's get started!";
+				response = Map();
+				bot = Map();
+				bot.put("name","Workast");
+				bot.put("image","https://cdn.workast.io/avatar.png");
+				response.put("bot",bot);
+				response.put("text",content);
+				buttons = list();
+				btn = Map();
+				btn.put("label","Map Channel");
+				btn.put("type","+");
+				action = Map();
+				action.put("type","invoke.function");
+				data = Map();
+				data.put("name","mapchannelform");
+				action.put("data",data);
+				btn.put("action",action);
+				btn.put("key","generated");
+				buttons.add(btn);
+				response.put("buttons",buttons);
+				return response;
+			}
+		}
+		if(sub_action == "Un Map Channel")
+		{
+			// Get all mappings from database
+			all_mappings = zoho.cliq.getRecords("workastchannelmapping",Map());
+			response = Map();
+			bot = Map();
+			bot.put("name","Workast");
+			bot.put("image","https://cdn.workast.io/avatar.png");
+			response.put("bot",bot);
+			// Greeting with user's name
+			greeting = "Hey " + user.get("first_name") + " 👋, here are your channel mappings:";
+			response.put("text",greeting);
+			slidesList = list();
+			// Check if there are any mappings
+			if(all_mappings.get("list").size() == 0)
+			{
+				// No mappings found
+				slidesList0 = Map();
+				slidesList0.put("type","text");
+				slidesList0.put("data","No channels have been mapped yet. Start mapping your channels to stay informed and boost productivity! 🚀\n\nUse `/workast mapchannel` to create your first mapping.");
+				slidesList.add(slidesList0);
+				response.put("slides",slidesList);
+				return response;
+			}
+			// Build slides for each mapping
+			for each  row in all_mappings.get("list")
+			{
+				slidesList0 = Map();
+				slidesList0.put("type","label");
+				encoded_name = row.get("name");
+				nameParts = encoded_name.toList("||");
+				workastName = nameParts.get(0);
+				slidesList0.put("title","Space: " + workastName);
+				// Workast space name
+				// Un Map button
+				buttonsList = list();
+				buttonsList0 = Map();
+				buttonsList0.put("label","Un Map");
+				buttonsList0.put("type","-");
+				action = Map();
+				action.put("type","invoke.function");
+				data = Map();
+				data.put("name","unmapchannel");
+				action.put("data",data);
+				buttonsList0.put("action",action);
+				buttonsList0.put("key",row.get("projectid"));
+				buttonsList.add(buttonsList0);
+				slidesList0.put("buttons",buttonsList);
+				// Data to display
+				dataList = list();
+				// Channel Name
+				dataList0 = Map();
+				dataList0.put("Channel Name","#" + row.get("channeluniquename"));
+				dataList.add(dataList0);
+				slidesList0.put("data",dataList);
+				slidesList.add(slidesList0);
+			}
+			response.put("slides",slidesList);
+			return response;
+		}
+		// -------------------------------------------------
+		// YOUR CODE ENDS HERE
+	}
+}
+catch (e)
+{
+	banner = {"text":"😕 Oops! Something went wrong while processing your request.\nPlease try again in a moment.","status":"warning","type":"banner"};
+	return banner;
+}
+return Map();

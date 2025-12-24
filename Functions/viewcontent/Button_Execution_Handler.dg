@@ -1,0 +1,111 @@
+
+active_tab = arguments.get("key");
+// ---------------- PAGE 1 ----------------
+if(active_tab == "help_next_page_1")
+{
+	response = Map();
+	card = Map();
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	slidesList = list();
+	slidesList0 = Map();
+	slidesList0.put("type","text");
+	slidesList0.put("data","### 📝 Tasks\n" + "**Create Task:**\n```/workast create a task```\n" + "**View Tasks From a Space:**\n```/workast view tasks```\n" + "🟡 Use this to create tasks and view all tasks inside a selected space.\n" + "---\n" + "### 🗂️ Spaces\n" + "**Create New Space / Group:**\n```/workast create space```\n" + "🟡 Organize your workflow by creating Workast Spaces for teams and projects.\n");
+	// NEXT BUTTON
+	buttonsList = list();
+	buttonsList0 = Map();
+	buttonsList0.put("label","Next Page ➡️");
+	buttonsList0.put("type","+");
+	action = Map();
+	action.put("type","invoke.function");
+	data = Map();
+	data.put("name","viewcontent");
+	action.put("data",data);
+	buttonsList0.put("action",action);
+	buttonsList0.put("key","help_next_page_2");
+	buttonsList.add(buttonsList0);
+	slidesList0.put("buttons",buttonsList);
+	slidesList.add(slidesList0);
+	response.put("slides",slidesList);
+	response.put("text","Page 2");
+	response.put("navigation","true");
+	return response;
+}
+// ---------------- PAGE 2 ----------------
+if(active_tab == "help_next_page_2")
+{
+	response = Map();
+	card = Map();
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	slidesList = list();
+	slidesList0 = Map();
+	slidesList0.put("type","text");
+	slidesList0.put("data","### 📝 Notes\n" + "**Create Note:**\n```/workast create note```\n" + "🟡 Create a new note inside a Workast space.\n\n" + "**View Note Details:**\n```/workast view note```\n" + "🟡 View complete note details including title, created by, created at, and last updated.\n" + "---\n");
+	buttonsList = list();
+	buttonsList0 = Map();
+	buttonsList0.put("label","Next Page ➡️");
+	buttonsList0.put("type","+");
+	action = Map();
+	action.put("type","invoke.function");
+	data = Map();
+	data.put("name","viewcontent");
+	action.put("data",data);
+	buttonsList0.put("action",action);
+	buttonsList0.put("key","help_next_page_3");
+	buttonsList.add(buttonsList0);
+	slidesList0.put("buttons",buttonsList);
+	slidesList.add(slidesList0);
+	response.put("slides",slidesList);
+	response.put("text","Page 3");
+	response.put("navigation","true");
+	return response;
+}
+// ---------------- PAGE 3 ----------------
+if(active_tab == "help_next_page_3")
+{
+	response = Map();
+	card = Map();
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	slidesList = list();
+	slidesList0 = Map();
+	slidesList0.put("type","text");
+	slidesList0.put("data","### 🔔 Channel Mappings\n" + "**Map Channel:**\n```/workast map channel```\n\n" + "**Un Map Channel:**\n```/workast un map channel```\n" + "🟡 Manage your Zoho Cliq → Workast channel connections.\n" + "Use these commands to link or remove mappings for receiving task updates.\n" + "---\n");
+	buttonsList = list();
+	buttonsList0 = Map();
+	buttonsList0.put("label","Next Page ➡️");
+	buttonsList0.put("type","+");
+	action = Map();
+	action.put("type","invoke.function");
+	data = Map();
+	data.put("name","viewcontent");
+	action.put("data",data);
+	buttonsList0.put("action",action);
+	buttonsList0.put("key","help_next_page_4");
+	buttonsList.add(buttonsList0);
+	slidesList0.put("buttons",buttonsList);
+	slidesList.add(slidesList0);
+	response.put("slides",slidesList);
+	response.put("text","Page 4");
+	response.put("navigation","true");
+	return response;
+}
+// ---------------- PAGE 4 — AI COMMANDS ----------------
+if(active_tab == "help_next_page_4")
+{
+	response = Map();
+	card = Map();
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	slidesList = list();
+	slidesList0 = Map();
+	slidesList0.put("type","text");
+	slidesList0.put("data","## 🤖 AI Commands — Smart Task Automation\n" + "Use natural language with `--ai` to automatically create, update, delete, and analyze tasks.\n\n" + "### ✉️ Message → Task (AI)\n" + "Turn any chat message into a structured Workast task using AI.\n\n" + "---\n\n" + "### 🧠 Space Analysis\n" + "**Space Health Report**\n" + "`get space health Marketing --ai`\n" + "Provides an AI-generated health summary of the selected Workast space.\n\n" + "---\n\n" + "### 📅 Daily Task Insights\n" + "**Analyse Today’s Tasks**\n" + "`analyse today tasks --ai`\n" + "Get a concise summary of tasks due today or overdue.\n\n" + "---\n\n" + "### ❌ Delete Tasks Using AI\n" + "**Delete Task**\n" + "`delete task fix login bug --ai`\n" + "AI identifies the matching task and deletes it.\n\n" + "---\n\n" + "### ✏️ Update Tasks\n" + "**Update Task**\n" + "`update task prepare slides change title to prepare notes --ai`\n" + "Update title, assignee, due date, or status.\n\n" + "---\n\n" + "### 🆕 Create & Assign Tasks\n" + "**Create Task / Assign Task**\n" + "`create task prepare proposal in Sales space assign to John --ai`\n" + "AI extracts title, space, due date, and assignee automatically.");
+	slidesList.add(slidesList0);
+	response.put("slides",slidesList);
+	response.put("text","AI Commands — Smart Task Automation");
+	response.put("navigation","true");
+	return response;
+}
+return Map();

@@ -1,9 +1,11 @@
 # Workast for Zoho Cliq
-Developed a Workast task-management extension integrated with Zoho Cliq.
-Enabled users to create/manage tasks, notes, spaces, and view real-time updates.
-Implemented channel mapping, comments, message-to-task conversion, and smart automation.
-Built an interactive Workast Widget with Dashboard, Tasks, Deadlines, Team, and Notes views.
-Added a daily reminder scheduler to notify users of tasks due today.
+
+Developed a Workast task-management extension integrated with Zoho Cliq
+Enabled users to create and manage tasks, notes, and spaces with real-time updates
+Implemented channel mapping, task comments, message-to-task conversion, and smart automation
+Built an interactive Workast Widget with Dashboard, Tasks, Deadlines, Team, and Notes views
+Added a daily reminder scheduler to notify users of tasks due today
+
 ---
 
 ## Overview
